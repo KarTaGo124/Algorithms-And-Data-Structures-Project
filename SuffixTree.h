@@ -1,7 +1,6 @@
 //
 // Created by Guillermo Galvez on 21/02/2025.
 //
-
 #ifndef ALGORITHMS_AND_DATA_STRUCTURES_PROJECT_SUFFIXTREE_H
 #define ALGORITHMS_AND_DATA_STRUCTURES_PROJECT_SUFFIXTREE_H
 
@@ -9,89 +8,104 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <climits> // Para INT_MAX
 using namespace std;
 
 #define ALPHABET_SIZE 27  // 26 letras de 'A' a 'Z' + 1 para '$'
 
 // Función auxiliar para mapear un carácter a un índice
+// (Este mapeo es parte de la definición de la estructura, ya que el paper asume
+//  un alfabeto de tamaño Σ = 26, aquí extendido para incluir '$')
 int getIndex(char c) {
     if (c == '$') return 26;
     return c - 'A';
 }
 
-// Estructura de Nodo del suffix tree
+// ======================= Estructura de Nodo =======================
+// Esta estructura representa un nodo del suffix tree.
+// [PAPER: Se define que cada nodo contiene la información de la subcadena (a través de start y end)
+//  y un arreglo de punteros a hijos. También se incluye suffixLink para la construcción lineal con Ukkonen.]
 struct Node {
-    int start;          // Índice de inicio del label en text
-    int *end;           // Puntero al índice final (para hojas se comparte la variable global)
-    int suffixIndex;    // Índice del sufijo (para hojas)
-    Node* suffixLink;   // Enlace de sufijo (para optimizar la construcción)
-    Node* children[ALPHABET_SIZE];  // Arreglo de punteros a hijos
+    int start;          // Índice de inicio del label (substring) en "text"
+    int *end;           // Puntero al índice final del label; para hojas, se comparte la variable global
+    int suffixIndex;    // Para hojas, almacena la posición del sufijo en "text" (base 0). Para nodos internos, se deja -1.
+    Node* suffixLink;   // [PAPER: Algoritmo 3] Suffix link para optimizar la construcción
+    Node* children[ALPHABET_SIZE];  // Arreglo de punteros a hijos, uno por cada posible carácter
 
-    // Constructor
+    // Constructor: Inicializa los atributos
     Node(int start, int* end) : start(start), end(end), suffixIndex(0), suffixLink(nullptr) {
         for (int i = 0; i < ALPHABET_SIZE; i++)
             children[i] = nullptr;
     }
 
-    // Calcula la longitud del borde (edge)
+    // Calcula la longitud del borde (edge) de este nodo
+    // [PAPER: Parte de la representación de nodos, donde se usan los índices start y end]
     int edgeLength() {
         return *end - start + 1;
     }
-
 };
 
+// ======================= Clase SuffixTree =======================
+// Esta clase implementa el suffix tree usando Ukkonen's algorithm (algoritmos 1 a 6)
+// y provee operaciones como búsqueda, encontrar todas las coincidencias (Algoritmo 8-9),
+// Longest Repeated Substring (Algoritmo 10) y Shortest Unique Substring (Algoritmo 11).
 class SuffixTree {
 private:
-    // ========= Campos principales =========
-    string text;           // Cadena de entrada (debe incluir '$' al final)
-    Node* root;            // Nodo raíz
-    Node* activeNode;      // Nodo activo
-    int activeLength;      // Longitud activa
-    char activeEdge;       // Carácter activo
-    int remainingSuffixCount; // Número de sufijos pendientes de inserción
-    int leafEnd;           // "end" global para las hojas
-    Node* lastCreatedNode; // Último nodo interno creado
+    // ===== Campos principales (usados en la construcción) =====
+    string text;           // Texto de entrada, debe incluir el símbolo terminal '$'
+    Node* root;            // [PAPER: "Create an empty root node"] Nodo raíz del árbol
+    Node* activeNode;      // Nodo activo (active point) durante la construcción
+    int activeLength;      // Longitud activa (cuántos caracteres se han recorrido en la arista activa)
+    char activeEdge;       // Carácter activo (la clave de la arista activa, se actualiza según el active point)
+    int remainingSuffixCount; // Número de sufijos pendientes de inserción (según Ukkonen)
+    int leafEnd;           // Variable global "end" que se comparte entre todas las hojas
+    Node* lastCreatedNode; // Último nodo interno creado, utilizado para asignar suffix links (Algoritmo 3)
 
-    // ========= Para el Algoritmo 10 (LRS) =========
-    int maxDepth;          // Profundidad máxima encontrada para un substring repetido
-    string bestString;     // Substring más largo repetido
+    // ===== Variables para Algoritmo 10: Longest Repeated Substring (LRS) =====
+    int maxDepth;          // Profundidad máxima (longitud total) alcanzada en un nodo interno repetido
+    string bestString;     // Substring más largo repetido, actualizado durante la DFS para LRS
 
-    // ========= Para el Algoritmo 11 (SUS) =========
-    int minLength;         // Longitud mínima de un substring único
+    // ===== Variables para Algoritmo 11: Shortest Unique Substring (SUS) =====
+    int minLength;         // Longitud mínima encontrada para un substring único
 
 public:
-    // Constructor: se espera que 's' ya incluya el símbolo '$'
+    // ======================= Constructor =======================
+    // [PAPER: Inicialización en Construction(S)]
+    // Se espera que 's' ya incluya el símbolo terminal '$'.
     SuffixTree(const string &s) : text(s), root(nullptr), activeNode(nullptr),
                                   activeLength(0), activeEdge('\0'), remainingSuffixCount(0),
-                                  leafEnd(-1), lastCreatedNode(nullptr) {
+                                  leafEnd(-1), lastCreatedNode(nullptr),
+                                  maxDepth(0), bestString(""), minLength(INT_MAX) {
         buildSuffixTree(); // Algoritmo 1: Construction(S)
-        setSuffixIndexByDFS(root, 0); // Asigna suffixIndex a cada hoja mediante una DFS
+        // [EXTRA] Asignación de suffixIndex a cada hoja mediante una DFS.
+        // Esto no aparece explícitamente en el pseudocódigo, pero es esencial en implementaciones prácticas.
+        setSuffixIndexByDFS(root, 0);
     }
 
     // ======================= (A) Asignar suffixIndex a las hojas =======================
-    // Se recorre el árbol en DFS y a cada hoja se le asigna suffixIndex = n - labelHeight
-    // en base 0. Para nodos internos, se mantiene -1.
+    // [EXTRA] Función auxiliar: recorre el árbol en DFS y asigna a cada hoja su suffixIndex.
+    // Según el paper, la posición del sufijo se puede determinar como n - labelHeight.
     void setSuffixIndexByDFS(Node* node, int labelHeight) {
         if (!node) return;
         bool isLeaf = true;
+        // Recorremos todos los hijos
         for (int i = 0; i < ALPHABET_SIZE; i++) {
             if (node->children[i] != nullptr) {
                 isLeaf = false;
                 Node* child = node->children[i];
-                // labelHeight + edgeLength del hijo
+                // Llamada recursiva: se suma la longitud del edge del hijo
                 setSuffixIndexByDFS(child, labelHeight + child->edgeLength());
             }
         }
         if (isLeaf) {
-            // Para una cadena de longitud n, si la ruta hasta aquí mide labelHeight,
-            // el sufijo correspondiente empieza en n - labelHeight (base 0).
+            // Para una cadena de longitud n, el sufijo que empieza en s se identifica con n - labelHeight.
             node->suffixIndex = (int)text.size() - labelHeight;
         }
     }
 
     // ======================= Algoritmo 1: Construction(S) =======================
-    // Data: Una cadena S de longitud n.
-    // Result: Un suffix tree T construido para S.
+    // Pseudocódigo (ver paper):
+    //   For i = 0 to n - 1, llamar a extendSuffixTree(i)
     void buildSuffixTree() {
         int n = text.size();
         int* rootEnd = new int(-1);
@@ -102,31 +116,26 @@ public:
         remainingSuffixCount = 0;
         lastCreatedNode = nullptr;
         leafEnd = -1;
-        // Para i ← 0 hasta n - 1
+        // Itera sobre cada carácter de la cadena
         for (int i = 0; i < n; i++) {
             extendSuffixTree(i); // Algoritmo 5: extendSuffixTree(i)
         }
     }
 
     // ======================= Algoritmo 2: walkDown(nextNode) =======================
-    // Data: Un puntero a nodo nextNode.
-    // Result: Si activeLength ≥ nextNode.edgeLength(), actualiza activePoint y retorna true.
+    // Pseudocódigo: Si activeLength ≥ edgeLength, actualiza activeEdge, activeLength y activeNode.
     bool walkDown(Node* nextNode) {
         if (activeLength >= nextNode->edgeLength()) {
-            // actualiza activeEdge: se toma el carácter en la nueva posición
-            activeEdge = text[nextNode->start + activeLength];
-            activeLength -= nextNode->edgeLength();
-            activeNode = nextNode;
+            activeEdge = text[nextNode->start + activeLength]; // Actualiza activeEdge
+            activeLength -= nextNode->edgeLength();              // Disminuye activeLength
+            activeNode = nextNode;                               // Mueve activeNode
             return true;
         }
         return false;
     }
 
-    // ---------------------- Algoritmo 3: createSuffixLink(node) ----------------------
-    // Actualiza el suffix link del último nodo interno creado.
-    // El parámetro 'setToNode' indica:
-    //   - true: lastCreatedNode se actualiza a 'node'
-    //   - false: se asigna el enlace y luego se resetea lastCreatedNode (se pone en nullptr)
+    // ======================= Algoritmo 3: createSuffixLink(node) =======================
+    // Pseudocódigo: Si lastCreatedNode ≠ null, asigna lastCreatedNode->suffixLink = node y luego lastCreatedNode = node.
     void createSuffixLink(Node *node, bool setToNode) {
         if (lastCreatedNode != nullptr) {
             lastCreatedNode->suffixLink = node;
@@ -137,151 +146,143 @@ public:
             lastCreatedNode = nullptr;
     }
 
-
     // ======================= Algoritmo 4: splitEdge(nextNode, activeLength) =======================
-    // Data: Nodo nextNode y la activeLength actual.
-    // Result: Divide el borde en la posición indicada y retorna el nuevo nodo interno (splitNode).
+    // Pseudocódigo: Divide la arista de nextNode en la posición (nextNode.start + activeLength - 1),
+    // crea un nodo interno (splitNode) y reorganiza los hijos.
     Node* splitEdge(Node* nextNode, int currentActiveLength) {
         int splitPosition = nextNode->start + currentActiveLength - 1;
         int* splitEnd = new int(splitPosition);
         Node* splitNode = new Node(nextNode->start, splitEnd);
-        // Redirige activeNode.children[activeEdge] al splitNode
+        // Reasigna el hijo de activeNode para activeEdge al splitNode.
         activeNode->children[getIndex(activeEdge)] = splitNode;
-        // Asigna nextNode como hijo de splitNode, usando el carácter siguiente del label
+        // Asigna nextNode como hijo del splitNode usando el siguiente carácter.
         splitNode->children[getIndex(text[splitPosition + 1])] = nextNode;
+        // Actualiza nextNode.start para que la arista del nodo dividido comience en splitPosition+1.
         nextNode->start = splitPosition + 1;
         return splitNode;
     }
 
     // ======================= Algoritmo 5: extendSuffixTree(i) =======================
-    // Data: Índice actual i.
-    // Result: Extiende el suffix tree con text[i].
+    // Pseudocódigo: Para cada i, extiende el árbol con text[i], actualizando leafEnd, remainingSuffixCount,
+    // activeEdge, activeLength, y utilizando walkDown, splitEdge, createSuffixLink.
     void extendSuffixTree(int i) {
-        // end ← end + 1
+        // Incrementa la variable global leafEnd (end ← end + 1)
         leafEnd = leafEnd + 1;
-        // remainingSuffixCount ← remainingSuffixCount + 1
+        // Incrementa el contador de sufijos pendientes (remainingSuffixCount ← remainingSuffixCount + 1)
         remainingSuffixCount++;
-        // lastCreatedNode ← null
+        // Reinicia lastCreatedNode
         lastCreatedNode = nullptr;
 
-        // Mientras queden sufijos pendientes de insertar
+        // Mientras existan sufijos pendientes (while remainingSuffixCount > 0)
         while (remainingSuffixCount > 0) {
-            // Si activeLength = 0, activeEdge ← text[i]
+            // Si activeLength es 0, asigna activeEdge al carácter actual
             if (activeLength == 0)
                 activeEdge = text[i];
 
-            // Índice para el hijo correspondiente a activeEdge
             int edgeIndex = getIndex(activeEdge);
-            // Si activeNode no tiene hijo para activeEdge
+            // Si no existe un hijo en activeNode para activeEdge:
             if (activeNode->children[edgeIndex] == nullptr) {
-                // Crear nueva hoja con start = i y end = leafEnd
+                // [PAPER: Regla 2] Crear una nueva hoja con start = i y end = leafEnd
                 Node* leaf = new Node(i, &leafEnd);
                 activeNode->children[edgeIndex] = leaf;
-                // Si lastCreatedNode ≠ null, asigna su suffixLink y luego lastCreatedNode ← null
+                // Asigna suffixLink al nodo actual si es necesario (Algoritmo 3)
                 createSuffixLink(activeNode, false);
             }
             else {
-                // Existe un hijo para activeEdge; asignar nextNode
+                // Si ya existe un hijo para activeEdge, lo asigna a nextNode
                 Node* nextNode = activeNode->children[edgeIndex];
-                // Si activeLength ≥ nextNode.edgeLength(), se usa walkDown (Algoritmo 2)
+                // Si activeLength ≥ nextNode.edgeLength(), usa walkDown (Algoritmo 2)
                 if (activeLength >= nextNode->edgeLength()) {
                     if (walkDown(nextNode))
                         continue;
                 }
-                // Si el carácter en nextNode coincide con text[i]
+                // Si el siguiente carácter en el edge de nextNode coincide con text[i]:
                 if (text[nextNode->start + activeLength] == text[i]) {
+                    // [PAPER: Regla 3] Incrementa activeLength y, si hay un nodo pendiente, actualiza su suffixLink.
                     activeLength = activeLength + 1;
-                    // Si lastCreatedNode ≠ null, asigna su suffixLink
                     if (lastCreatedNode != nullptr)
                         lastCreatedNode->suffixLink = activeNode;
-                    // Romper el while ya que no se requiere más extensión
+                    // No es necesario extender más en esta fase; se rompe el while.
                     break;
                 }
-                // Caso de discrepancia: dividir la arista (Algoritmo 4)
+                // Si hay una discrepancia, se divide la arista (Algoritmo 4)
                 Node* splitNode = splitEdge(nextNode, activeLength);
-                // Crear nueva hoja para text[i] con start = i y end = leafEnd
+                // Crea una nueva hoja para text[i] con start = i y end = leafEnd.
                 Node* leaf = new Node(i, &leafEnd);
                 splitNode->children[getIndex(text[i])] = leaf;
-                // Actualiza lastCreatedNode al nodo interno creado
+                // Actualiza lastCreatedNode al nodo interno recién creado.
                 createSuffixLink(splitNode, true);
             }
-            // remainingSuffixCount ← remainingSuffixCount - 1
+            // Decrementa el contador de sufijos pendientes.
             remainingSuffixCount = remainingSuffixCount - 1;
 
             // ======================= Algoritmo 6: setActivePoint(i) =======================
+            // Actualiza el active point para la próxima extensión.
             if (activeNode == root && activeLength > 0) {
                 activeLength = activeLength - 1;
                 activeEdge = text[i - remainingSuffixCount + 1];
             }
             else if (activeNode != root) {
-                // Si activeNode no es la raíz, se mueve al suffixLink del activeNode
                 activeNode = (activeNode->suffixLink != nullptr) ? activeNode->suffixLink : root;
             }
         } // Fin del while
     }
 
-    // Destructor: libera toda la memoria usada por el suffix tree
-    ~SuffixTree() {
-        destroyNode(root);  // Llama a la función recursiva para destruir el árbol (pseudocódigo: Destroy())
-        root = nullptr;
-    }
-
-    // ======================= Algoritmo 7: destroyNode(i) =======================
-    // Función recursiva que libera todos los nodos en postorden (pseudocódigo: destroyNode(v))
+    // ======================= Algoritmo 7: Destroy() =======================
+    // [PAPER: Algoritmo 7] Destruye el árbol realizando una travesía postorden.
     void destroyNode(Node* v) {
         if (v == nullptr)
             return;
-        // Recorrer cada hijo y destruirlo
+        // Recorrer cada hijo y destruirlo.
         for (int i = 0; i < ALPHABET_SIZE; i++) {
             if (v->children[i] != nullptr) {
                 destroyNode(v->children[i]);
             }
         }
-        // Si el puntero 'end' no es el de la variable global leafEnd, eliminarlo
+        // Si el puntero 'end' no es el de la variable global leafEnd, libéralo.
         if (v->end != &leafEnd)
             delete v->end;
         delete v;
     }
 
+    // Destructor: [EXTRA] Llama a destroyNode para liberar toda la memoria.
+    ~SuffixTree() {
+        destroyNode(root);
+        root = nullptr;
+    }
+
     // ======================= Algoritmo 8: Search(P) =======================
-    // Data: Suffix tree T construido a partir de la cadena text, y un patrón P.
-    // Result: Retorna true si P existe en text, false en caso contrario.
+    // Pseudocódigo: Se recorre el árbol siguiendo los caracteres de P. Si en algún
+    // momento no existe la rama adecuada o hay discrepancia, retorna false.
     bool search(const string &pattern) {
         Node* v = root;  // v ← Root(T)
         int pos = 0;     // pos ← 0
 
-        // Mientras queden caracteres en el patrón
+        // Mientras queden caracteres en P
         while (pos < pattern.size()) {
             char currentChar = pattern[pos];
             int idx = getIndex(currentChar);
-
-            // Si v no tiene hijo con label que empiece con P[pos]
+            // Si no existe hijo en v con label que empieza con P[pos], retorna false.
             if (v->children[idx] == nullptr)
-                return false;  // return false
-
-            // v ← v.child(P[pos])
+                return false;
+            // Se mueve a ese hijo.
             v = v->children[idx];
-
-            // Se obtiene la longitud del label de la arista
             int edgeLen = v->edgeLength();
-            // len ← min(|edge|, |P| - pos)
             int len = (edgeLen < (pattern.size() - pos)) ? edgeLen : (pattern.size() - pos);
-
-            // Comparar caracter a caracter: si hay discrepancia, return false
+            // Compara el substring de la arista con el segmento de P.
             for (int i = 0; i < len; i++) {
                 if (text[v->start + i] != pattern[pos + i])
                     return false;
             }
-            pos += len;  // pos ← pos + len
+            pos += len;
         }
         return true;
     }
 
     // ======================= Algoritmo 9: FindAllMatches(P) =======================
-    // Data: Un suffix tree T construido a partir de la cadena text (con '$' terminal)
-    //       y un patrón P.
-    // Result: Retorna un vector<int> con las posiciones en text donde P ocurre,
-    //         usando siempre indexación base 0. (root tiene index 0)
+    // Pseudocódigo: Se recorre el árbol según P. Si se llega al final del patrón,
+    // se recogen los suffixIndex de todas las hojas en ese subárbol.
+    // Retorna un vector<int> con las posiciones (en base 0).
     vector<int> findAllMatches(const string &pattern) {
         vector<int> matches;
         Node* v = root;
@@ -291,28 +292,25 @@ public:
             int idx = getIndex(pattern[pos]);
             if (v->children[idx] == nullptr)
                 return matches; // No se encontró el patrón
-
             Node* child = v->children[idx];
             int edgeLen = child->edgeLength();
             int len = (edgeLen < (int) pattern.size() - pos) ? edgeLen : ((int) pattern.size() - pos);
-
             for (int i = 0; i < len; i++) {
                 if (text[child->start + i] != pattern[pos + i])
-                    return matches; // Discrepancia, patrón no existe
+                    return matches; // Discrepancia: patrón no existe
             }
             pos += len;
             v = child;
         }
 
+        // Recolecta los suffixIndex de las hojas del subárbol alcanzado.
         getLeafIndices(v, matches);
-
         sort(matches.begin(), matches.end());
-
-        return matches;
+        matches.erase(unique(matches.begin(), matches.end()), matches.end());
+        return matches; // Retorna posiciones en base 0.
     }
 
-
-    // Método para recolectar los índices de las hojas a partir de un nodo dado.
+    // [EXTRA] Método auxiliar: Recolecta los suffixIndex de todas las hojas en el subárbol de 'node'.
     void getLeafIndices(Node* node, vector<int>& matches) {
         bool isLeaf = true;
         for (int i = 0; i < ALPHABET_SIZE; i++) {
@@ -322,12 +320,13 @@ public:
             }
         }
         if (isLeaf) {
-            // En una hoja, usamos suffixIndex, que contiene el índice correcto del sufijo.
             matches.push_back(node->suffixIndex);
         }
     }
 
-    // ======================= Algoritmo 10: Longest Repeated Substring =======================
+    // ======================= Algoritmo 10: Longest Repeated Substring (LRS) =======================
+    // Pseudocódigo: Se recorre el árbol en DFS y se identifica el nodo interno
+    // con la ruta (path label) más larga que aparece al menos dos veces.
     string longestRepeatedSubstring() {
         maxDepth = 0;
         bestString.clear();
@@ -335,40 +334,101 @@ public:
         return bestString;
     }
 
-    // DFS auxiliar para LRS
+    // DFS auxiliar para LRS.
+    // Recorre el árbol, y si un nodo interno tiene al menos 2 hijos y la profundidad es mayor,
+    // se actualiza el candidato bestString.
     void lrsDFS(Node* node, int depth, const string &pathSoFar) {
         if (!node) return;
-
-        // Contar cuántos hijos tiene el nodo
         int childCount = 0;
         for (int i = 0; i < ALPHABET_SIZE; i++) {
             if (node->children[i] != nullptr)
                 childCount++;
         }
-
-        // Si el nodo tiene >= 2 hijos, es un substring repetido
         if (childCount >= 2 && depth > maxDepth) {
             maxDepth = depth;
             bestString = pathSoFar;
         }
-
-        // Recorrer hijos
         for (int i = 0; i < ALPHABET_SIZE; i++) {
             Node* child = node->children[i];
             if (child != nullptr) {
                 int length = child->edgeLength();
-                // Concatena el label de la arista
                 string edgeLabel = text.substr(child->start, length);
                 lrsDFS(child, depth + length, pathSoFar + edgeLabel);
             }
         }
     }
 
-    // ======================= Algoritmo 11: Shortest Unique Substring =======================
+    // ======================= Algoritmo 11: Shortest Unique Substring (SUS) =======================
+    // Pseudocódigo: Se recorre el árbol en DFS. En cada nodo interno se verifica si su subárbol
+    // conduce a exactamente 1 hoja. Si es así, y si la longitud del path acumulado es menor que el mínimo,
+    // se actualiza el candidato. Se ignoran candidatos que contengan '$'.
+    // Nota: Se incluye un manejo extra para evaluar candidatos implícitos (prefijos de edges).
+    string shortestUniqueSubstring() {
+        minLength = INT_MAX;
+        bestString = "";
+        dfsShortestUnique(root, 0, "");
+        return bestString;
+    }
 
-    // todo: Implementar el algoritmo 11
+    // DFS auxiliar para SUS.
+    // Retorna el número de hojas en el subárbol de 'node'.
+    // Si un nodo interno tiene exactamente 1 hoja y el path acumulado (sin '$') es menor que el mínimo,
+    // se actualiza el candidato.
+    int dfsShortestUnique(Node* node, int depth, const string &pathSoFar) {
+        if (!node)
+            return 0;
 
-    // Función para imprimir las aristas del árbol
+        bool isExplicitLeaf = true;
+        int totalLeaves = 0;
+        // Recorre todos los hijos (se consideran todos, ya que '$' puede estar en la arista,
+        // pero se descartará el candidato si contiene '$')
+        for (int i = 0; i < ALPHABET_SIZE; i++) {
+            if (node->children[i] != nullptr) {
+                isExplicitLeaf = false;
+                Node* child = node->children[i];
+                int len = child->edgeLength();
+                string edgeLabel = text.substr(child->start, len);
+                totalLeaves += dfsShortestUnique(child, depth + len, pathSoFar + edgeLabel);
+            }
+        }
+        if (isExplicitLeaf) {
+            totalLeaves = 1;
+        }
+        else {
+            // Si este nodo (explícito) tiene exactamente 1 hoja y el path acumulado no contiene '$'
+            // y su profundidad es menor que el mínimo encontrado, se actualiza.
+            if (totalLeaves == 1 && depth < minLength && pathSoFar.find('$') == string::npos) {
+                minLength = depth;
+                bestString = pathSoFar;
+            }
+            // [EXTRA] Evaluación de candidatos implícitos:
+            // Para cada hijo que es hoja, se considera tomar como candidato el path acumulado
+            // más el primer carácter del label del hijo, lo que podría dar un substring único más corto.
+            for (int i = 0; i < ALPHABET_SIZE; i++) {
+                if (node->children[i] != nullptr) {
+                    Node* child = node->children[i];
+                    bool childIsLeaf = true;
+                    for (int j = 0; j < ALPHABET_SIZE; j++) {
+                        if (child->children[j] != nullptr) {
+                            childIsLeaf = false;
+                            break;
+                        }
+                    }
+                    if (childIsLeaf) {
+                        string candidate = pathSoFar + text.substr(child->start, 1);
+                        if (depth + 1 < minLength && candidate.find('$') == string::npos) {
+                            minLength = depth + 1;
+                            bestString = candidate;
+                        }
+                    }
+                }
+            }
+        }
+        return totalLeaves;
+    }
+
+    // ======================= [EXTRA] Funciones de impresión =======================
+    // Función para imprimir las aristas del árbol (para depuración/visualización)
     void printEdges(Node *n, int height = 0) {
         if (n == nullptr)
             return;
@@ -384,12 +444,11 @@ public:
         }
     }
 
-    // Función para imprimir el árbol completo
+    // [EXTRA] Función para imprimir el árbol completo.
     void printTree() {
-        cout << "Suffix Tree:" << "\n";
+        cout << "Suffix Tree:\n";
         printEdges(root);
     }
 };
-
 
 #endif //ALGORITHMS_AND_DATA_STRUCTURES_PROJECT_SUFFIXTREE_H
