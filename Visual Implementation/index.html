@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Suffix Tree Demo</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>Suffix Tree Demo</h1>
+  
+  <!-- Input for building the tree -->
+  <div>
+    <input id="inputString" type="text" placeholder="Enter a string" />
+    <button id="buildTreeBtn">Build Suffix Tree</button>
+  </div>
+
+  <!-- Step navigation (like Brenden's format) -->
+  <div>
+    <p id="stepIndicator">Step 0 of 0</p>
+    <button id="prevBtn">Prev</button>
+    <button id="nextBtn">Next</button>
+  </div>
+
+  <!-- Visualization container (will display text or an SVG) -->
+  <div id="treeContainer"></div>
+
+  <!-- Operations: pattern search, find all matches, LRS, SUS -->
+  <div>
+    <input id="patternInput" type="text" placeholder="Pattern to search" />
+    <button id="searchBtn">Search Pattern</button>
+    <button id="allMatchesBtn">Find All Matches</button>
+    <button id="lrsBtn">Longest Repeated Substring</button>
+    <button id="susBtn">Shortest Unique Substring</button>
+  </div>
+
+  <!-- Results or status messages -->
+  <div id="resultContainer"></div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
