@@ -1,19 +1,15 @@
-//
-// Created by Guillermo Galvez on 21/02/2025.
-//
-
 #include "SuffixTree.h"
 
-void capitalizeString(string& s) {
-    for (char & i : s) {
-        if(i >= 'a' && i <= 'z')
+void capitalizeString(string &s) {
+    for (char &i: s) {
+        if (i >= 'a' && i <= 'z')
             i = i - 'a' + 'A';
     }
 }
 
 int main() {
     string input;
-    cout << "Ingrese la cadena (se agregará '$' al final): ";
+    cout << "Ingrese la cadena (se agregara '$' al final): ";
     cin >> input;
     capitalizeString(input);
     input.push_back('$');
@@ -46,10 +42,10 @@ int main() {
     cout << "Encontrar todas las ocurrencias de la cadena " << substring << " en la cadena original:" << endl;
     vector<int> positions = st.findAllMatches(substring);
     if (positions.empty()) {
-        cout << "El patrón no se encontró en el texto." << endl;
+        cout << "El patron no se encontro en el texto." << endl;
     } else {
-        cout << "El patrón se encontró en las posiciones: ";
-        for (int pos : positions)
+        cout << "El patron se encontro en las posiciones: ";
+        for (const int pos: positions)
             cout << pos << " ";
         cout << endl;
     }
