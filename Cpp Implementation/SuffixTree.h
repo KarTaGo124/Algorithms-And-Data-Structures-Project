@@ -440,7 +440,7 @@ public:
 
     // [EXTRA] Función para imprimir el árbol completo.
     void printTree() {
-        cout << "Suffix Tree:\n";
+        cout << "Suffix Tree construido:\n";
         printEdges(root);
     }
 };
