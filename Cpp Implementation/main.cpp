@@ -25,8 +25,7 @@ int main() {
     cout << "\nString Matching:\nIngrese la cadena a buscar: ";
     cin >> pattern;
     capitalizeString(pattern);
-    bool found = st.search(pattern);
-    if (found) {
+    if (st.search(pattern)) {
         cout << "El patron " << pattern << " fue encontrado. \n";
     } else {
         cout << "El patron " << pattern << " no fue encontrado. \n";
@@ -48,8 +47,7 @@ int main() {
     }
 
     // Algorithm 10: Longest repeated substring
-    string lrs;
-    lrs = st.longestRepeatedSubstring();
+    const string lrs = st.longestRepeatedSubstring();
     cout << "\nLongest Repeated Substring:\n";
     if (lrs.empty()) {
         cout << "No hay subcadenas repetidas." << endl;
@@ -58,8 +56,7 @@ int main() {
     }
 
     // Algorithm 11: Shortest unique substring
-    string sus;
-    sus = st.shortestUniqueSubstring();
+    const string sus = st.shortestUniqueSubstring();
     cout << "\nShortest Unique Substring:\n";
     if (sus.empty()) {
         cout << "No hay subcadenas únicas." << endl;
