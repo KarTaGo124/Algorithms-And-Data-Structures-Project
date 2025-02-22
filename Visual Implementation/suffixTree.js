@@ -335,36 +335,75 @@ class Node {
      * We'll do a simple DFS approach. This is a simplified version; you can refine if needed.
      */
     shortestUniqueSubstring() {
-      let sus = "";
-      let minLen = Number.MAX_SAFE_INTEGER;
-      const self = this;
-  
-      function dfs(node, path) {
-        if (!node) return 0;
-        let leafCount = 0;
-        let childCount = 0;
-        for (let i = 0; i < 27; i++) {
-          if (node.children[i]) {
-            childCount++;
-            const child = node.children[i];
-            const edgeLen = child.edgeLength(self.leafEnd);
-            const edgeStr = self.text.substring(child.start, child.start + edgeLen);
-            leafCount += dfs(child, path + edgeStr);
+        let sus = "";
+        let minLen = Number.MAX_SAFE_INTEGER;
+        const self = this;
+      
+        /**
+         * DFS that:
+         *  1. Computes how many leaves exist under each node (leafCount).
+         *  2. If leafCount == 1, the path from root to this node is unique.
+         *  3. We then consider partial prefixes of the *last* edge used to get here,
+         *     ensuring we catch smaller substrings that do not contain '$'.
+         */
+        function dfs(node, pathSoFar) {
+          if (!node) return 0;
+      
+          let totalLeaves = 0;
+          let childCount = 0;
+      
+          // Explore each child
+          for (let i = 0; i < 27; i++) {
+            if (node.children[i]) {
+              childCount++;
+              const child = node.children[i];
+              // Full label for the edge child
+              const edgeLen = child.edgeLength(self.leafEnd);
+              const edgeStr = self.text.substring(child.start, child.start + edgeLen);
+      
+              // Recursively count leaves in the child's subtree
+              totalLeaves += dfs(child, pathSoFar + edgeStr);
+            }
           }
+      
+          // If no children, this node is a leaf => 1 leaf
+          if (childCount === 0) {
+            totalLeaves = 1;
+          }
+      
+          // If exactly 1 leaf => the entire pathSoFar is unique
+          if (totalLeaves === 1) {
+            // But pathSoFar might contain '$' (we discard those).
+            // Also, the entire pathSoFar might be large. We want to check
+            // partial prefixes of the *last* edge we just added, because
+            // a shorter prefix might already be unique.
+            if (!pathSoFar.includes('$') && pathSoFar.length > 0 && pathSoFar.length < minLen) {
+              minLen = pathSoFar.length;
+              sus = pathSoFar;
+            }
+      
+            // --- PARTIAL-EDGE LOGIC ---
+            // The pathSoFar is the entire string from root to this node.
+            // We can try every proper prefix (1..pathSoFar.length) to see if it's smaller,
+            // provided it doesn't contain '$'.
+            // Because if the entire path is unique, any prefix that doesn't intersect a branching
+            // is also unique (the tree compressed a single chain).
+            for (let prefixLen = 1; prefixLen < pathSoFar.length; prefixLen++) {
+              const candidate = pathSoFar.substring(0, prefixLen);
+              if (candidate.includes('$')) break; // skip if it has '$'
+              if (candidate.length < minLen) {
+                minLen = candidate.length;
+                sus = candidate;
+              }
+            }
+          }
+      
+          return totalLeaves;
         }
-        if (childCount === 0) {
-          leafCount = 1; // It's a leaf
-        }
-        // If exactly 1 leaf in this subtree, path is unique
-        if (leafCount === 1 && !path.includes('$') && path.length < minLen && path.length > 0) {
-          minLen = path.length;
-          sus = path;
-        }
-        return leafCount;
+      
+        dfs(this.root, "");
+        return sus;
       }
-  
-      dfs(this.root, "");
-      return sus;
-    }
+      
   }
   
