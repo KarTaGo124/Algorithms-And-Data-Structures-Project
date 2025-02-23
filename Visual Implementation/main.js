@@ -141,138 +141,178 @@ function renderStep(stepIndex) {
   treeContainerEl.appendChild(info);
 }
 
-// ====================== SVG Tree Drawing ======================
+// ====================== SVG Tree Drawing (Tidy Layout) ======================
 
+/**
+ * Build a simple hierarchy object from the suffix tree snapshot.
+ * Each node in the returned object has:
+ *   { edgeLabel: string, nodeRef: Node, children: [], x: number, depth: number }
+ */
 function buildHierarchy(node, parentEdgeLabel, text, leafEnd) {
-  if (!node) return null;
-  const label = parentEdgeLabel || "";
-  const data = {
-    id: Math.random().toString(36).slice(2),
-    edgeLabel: label,
-    nodeRef: node,
-    children: []
-  };
-  for (let i = 0; i < 27; i++) {
-    if (node.children[i]) {
-      const child = node.children[i];
-      const edgeLen = child.edgeLength(leafEnd);
-      const edgeStr = text.substring(child.start, child.start + edgeLen);
-      const childData = buildHierarchy(child, edgeStr, text, leafEnd);
-      if (childData) {
-        data.children.push(childData);
+    if (!node) return null;
+    const label = parentEdgeLabel || "";
+    const data = {
+      edgeLabel: label,
+      nodeRef: node,
+      children: [],
+      x: 0,
+      depth: 0 // we'll store the "level" in the tree here
+    };
+    for (let i = 0; i < 27; i++) {
+      if (node.children[i]) {
+        const child = node.children[i];
+        const edgeLen = child.edgeLength(leafEnd);
+        const edgeStr = text.substring(child.start, child.start + edgeLen);
+        const childData = buildHierarchy(child, edgeStr, text, leafEnd);
+        if (childData) {
+          data.children.push(childData);
+        }
       }
     }
+    return data;
   }
-  return data;
-}
-
-function computeSubtreeWidth(h) {
-  if (!h.children || h.children.length === 0) {
-    return 1;
-  }
-  let width = 0;
-  for (const c of h.children) {
-    width += computeSubtreeWidth(c);
-  }
-  return width;
-}
-
-function layoutTree(h, xStart, depth, xStep, yStep) {
-  const subtreeWidth = computeSubtreeWidth(h);
-  h.x = xStart + (subtreeWidth * xStep) / 2;
-  h.y = depth * yStep;
-
-  let offset = xStart;
-  for (const child of h.children) {
-    const w = computeSubtreeWidth(child);
-    layoutTree(child, offset, depth + 1, xStep, yStep);
-    offset += w;
-  }
-}
-
-function drawTreeSVG(rootNode, text, leafEnd, containerEl) {
-  const hierarchy = buildHierarchy(rootNode, "", text, leafEnd);
-  if (!hierarchy) {
-    containerEl.textContent = "Empty tree snapshot.";
-    return;
-  }
-
-  const xStep = 60;
-  const yStep = 80;
-  layoutTree(hierarchy, 0, 0, xStep, yStep);
-
-  let minX = Infinity, maxX = -Infinity, maxY = 0;
-  const allNodes = [];
-
-  function collectNodes(h) {
-    allNodes.push(h);
-    if (h.x < minX) minX = h.x;
-    if (h.x > maxX) maxX = h.x;
-    if (h.y > maxY) maxY = h.y;
-    for (const c of h.children) {
-      collectNodes(c);
+  
+  // A global counter to assign unique x-coordinates to leaves.
+  let globalLeafCounter = 0;
+  
+  /**
+   * Recursively assign (x, depth) to each node in a tidy manner:
+   *  - If node has no children, it's a leaf => node.x = globalLeafCounter++.
+   *  - Otherwise, layout children first, then node.x = midpoint of children’s x.
+   *  - node.depth = depth.
+   */
+  function layoutTidy(node, depth) {
+    node.depth = depth;
+    if (node.children.length === 0) {
+      // Leaf node
+      node.x = globalLeafCounter++;
+    } else {
+      // Internal node: lay out children, track min & max child.x
+      let minX = Infinity;
+      let maxX = -Infinity;
+      for (const child of node.children) {
+        layoutTidy(child, depth + 1);
+        if (child.x < minX) minX = child.x;
+        if (child.x > maxX) maxX = child.x;
+      }
+      // Place the parent at the midpoint of its children
+      node.x = (minX + maxX) / 2;
     }
   }
-  collectNodes(hierarchy);
-
-  const width = maxX - minX + 100;
-  const height = maxY + 100;
-
-  // Create <svg>
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", width);
-  svg.setAttribute("height", height);
-  svg.style.backgroundColor = "#f9f9f9";
-  containerEl.appendChild(svg);
-
-  // Draw edges
-  function drawEdges(h) {
-    for (const child of h.children) {
-      // line
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      line.setAttribute("x1", h.x - minX + 50);
-      line.setAttribute("y1", h.y + 50);
-      line.setAttribute("x2", child.x - minX + 50);
-      line.setAttribute("y2", child.y + 50);
-      line.setAttribute("stroke", "#999");
-      svg.appendChild(line);
-
-      // label
-      const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      label.setAttribute("x", (h.x + child.x)/2 - minX + 50);
-      label.setAttribute("y", (h.y + child.y)/2 + 45); 
-      label.setAttribute("fill", "black");
-      label.setAttribute("text-anchor", "middle");
-      label.textContent = child.edgeLabel;
-      svg.appendChild(label);
-
-      drawEdges(child);
+  
+  /**
+   * Draw the suffix tree snapshot as an <svg> using our tidy layout.
+   */
+  function drawTreeSVG(rootNode, text, leafEnd, containerEl) {
+    // Build hierarchy
+    const hierarchy = buildHierarchy(rootNode, "", text, leafEnd);
+    if (!hierarchy) {
+      containerEl.textContent = "Empty tree snapshot.";
+      return;
+    }
+  
+    // 1) Layout
+    globalLeafCounter = 0;
+    layoutTidy(hierarchy, 0);
+  
+    // 2) Collect all nodes for bounding box
+    let minX = Infinity, maxX = -Infinity;
+    let minDepth = Infinity, maxDepth = -Infinity;
+    const allNodes = [];
+  
+    function collectNodes(h) {
+      allNodes.push(h);
+      if (h.x < minX) minX = h.x;
+      if (h.x > maxX) maxX = h.x;
+      if (h.depth < minDepth) minDepth = h.depth;
+      if (h.depth > maxDepth) maxDepth = h.depth;
+      for (const c of h.children) {
+        collectNodes(c);
+      }
+    }
+    collectNodes(hierarchy);
+  
+    // 3) Compute final width/height for <svg>
+    const MARGIN = 60;
+    const X_SCALE = 120;    // Horizontal spacing factor
+    const Y_SPACING = 120;  // Vertical distance between levels
+  
+    // Width covers from minX..maxX, each "unit" scaled by X_SCALE
+    const width = (maxX - minX + 1) * X_SCALE + 2 * MARGIN;
+    // Height covers from minDepth..maxDepth, each level is Y_SPACING
+    const height = (maxDepth - minDepth + 1) * Y_SPACING + 2 * MARGIN;
+  
+    // Create an <svg>
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", width);
+    svg.setAttribute("height", height);
+    svg.style.backgroundColor = "#f9f9f9";
+    containerEl.appendChild(svg);
+  
+    // Draw edges
+    function drawEdges(parent) {
+      for (const child of parent.children) {
+        // parent coords
+        const px = (parent.x - minX) * X_SCALE + MARGIN;
+        const py = (parent.depth - minDepth) * Y_SPACING + MARGIN;
+        // child coords
+        const cx = (child.x - minX) * X_SCALE + MARGIN;
+        const cy = (child.depth - minDepth) * Y_SPACING + MARGIN;
+  
+        // line
+        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+        line.setAttribute("x1", px);
+        line.setAttribute("y1", py);
+        line.setAttribute("x2", cx);
+        line.setAttribute("y2", cy);
+        line.setAttribute("stroke", "#999");
+        line.setAttribute("stroke-width", "2");
+        svg.appendChild(line);
+  
+        // label near the midpoint
+        const mx = (px + cx) / 2;
+        const my = (py + cy) / 2;
+        const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        label.setAttribute("x", mx);
+        label.setAttribute("y", my - 5); // shift up a bit
+        label.setAttribute("fill", "black");
+        label.setAttribute("text-anchor", "middle");
+        label.textContent = child.edgeLabel;
+        svg.appendChild(label);
+  
+        drawEdges(child);
+      }
+    }
+    drawEdges(hierarchy);
+  
+    // Draw nodes
+    for (const node of allNodes) {
+      const nx = (node.x - minX) * X_SCALE + MARGIN;
+      const ny = (node.depth - minDepth) * Y_SPACING + MARGIN;
+  
+      // Circle
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", nx);
+      circle.setAttribute("cy", ny);
+      circle.setAttribute("r", 15);
+      circle.setAttribute("fill", "#f66");
+      circle.setAttribute("stroke", "#333");
+      circle.setAttribute("stroke-width", "1");
+      svg.appendChild(circle);
+  
+      // Label: leaf suffixIndex or "•" for internal
+      let nodeLabel = "•";
+      if (node.nodeRef.suffixIndex !== -1) {
+        nodeLabel = String(node.nodeRef.suffixIndex);
+      }
+      const textEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      textEl.setAttribute("x", nx);
+      textEl.setAttribute("y", ny + 5);
+      textEl.setAttribute("fill", "white");
+      textEl.setAttribute("font-weight", "bold");
+      textEl.setAttribute("text-anchor", "middle");
+      textEl.textContent = nodeLabel;
+      svg.appendChild(textEl);
     }
   }
-  drawEdges(hierarchy);
-
-  // Draw nodes
-  for (const h of allNodes) {
-    const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    circle.setAttribute("cx", h.x - minX + 50);
-    circle.setAttribute("cy", h.y + 50);
-    circle.setAttribute("r", 15);
-    circle.setAttribute("fill", "#f66");
-    circle.setAttribute("stroke", "#333");
-    circle.setAttribute("stroke-width", "1");
-    svg.appendChild(circle);
-
-    let nodeLabel = "•";
-    if (h.nodeRef.suffixIndex !== -1) {
-      nodeLabel = String(h.nodeRef.suffixIndex);
-    }
-    const textEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
-    textEl.setAttribute("x", h.x - minX + 50);
-    textEl.setAttribute("y", h.y + 55);
-    textEl.setAttribute("fill", "white");
-    textEl.setAttribute("font-weight", "bold");
-    textEl.setAttribute("text-anchor", "middle");
-    textEl.textContent = nodeLabel;
-    svg.appendChild(textEl);
-  }
-}
+  
