@@ -251,38 +251,60 @@ function buildHierarchy(node, parentEdgeLabel, text, leafEnd) {
   
     // Draw edges
     function drawEdges(parent) {
-      for (const child of parent.children) {
-        // parent coords
-        const px = (parent.x - minX) * X_SCALE + MARGIN;
-        const py = (parent.depth - minDepth) * Y_SPACING + MARGIN;
-        // child coords
-        const cx = (child.x - minX) * X_SCALE + MARGIN;
-        const cy = (child.depth - minDepth) * Y_SPACING + MARGIN;
-  
-        // line
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("x1", px);
-        line.setAttribute("y1", py);
-        line.setAttribute("x2", cx);
-        line.setAttribute("y2", cy);
-        line.setAttribute("stroke", "#999");
-        line.setAttribute("stroke-width", "2");
-        svg.appendChild(line);
-  
-        // label near the midpoint
-        const mx = (px + cx) / 2;
-        const my = (py + cy) / 2;
-        const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-        label.setAttribute("x", mx);
-        label.setAttribute("y", my - 5); // shift up a bit
-        label.setAttribute("fill", "black");
-        label.setAttribute("text-anchor", "middle");
-        label.textContent = child.edgeLabel;
-        svg.appendChild(label);
-  
-        drawEdges(child);
+        for (const child of parent.children) {
+          // parent coords
+          const px = (parent.x - minX) * X_SCALE + MARGIN;
+          const py = (parent.depth - minDepth) * Y_SPACING + MARGIN;
+          // child coords
+          const cx = (child.x - minX) * X_SCALE + MARGIN;
+          const cy = (child.depth - minDepth) * Y_SPACING + MARGIN;
+      
+          // Draw the line
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+          line.setAttribute("x1", px);
+          line.setAttribute("y1", py);
+          line.setAttribute("x2", cx);
+          line.setAttribute("y2", cy);
+          line.setAttribute("stroke", "#999");
+          line.setAttribute("stroke-width", "2");
+          svg.appendChild(line);
+      
+          // Calculate midpoint for the label
+          const mx = (px + cx) / 2;
+          const my = (py + cy) / 2;
+      
+          // Calculate the angle (in degrees) of the line
+          let angleDeg = (Math.atan2(cy - py, cx - px) * 180) / Math.PI;
+      
+          // OPTIONAL: Keep text from appearing upside-down. If the angle is
+          // beyond +/-90°, flip it by 180° so the label reads left-to-right.
+          if (angleDeg > 90) {
+            angleDeg -= 180;
+          } else if (angleDeg < -90) {
+            angleDeg += 180;
+          }
+      
+          // Create and position the label
+          const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          // We first translate to the midpoint, rotate, then translate "up" (-10) 
+          // so the text is slightly off the line
+          label.setAttribute(
+            "transform",
+            `translate(${mx},${my}) rotate(${angleDeg}) translate(0,-10)`
+          );
+          label.setAttribute("fill", "black");
+          label.setAttribute("text-anchor", "middle");
+          // So the text is vertically centered on the baseline after rotation
+          label.setAttribute("dominant-baseline", "middle");
+      
+          label.textContent = child.edgeLabel;
+          svg.appendChild(label);
+      
+          // Recurse
+          drawEdges(child);
+        }
       }
-    }
+      
     drawEdges(hierarchy);
   
     // Draw nodes
