@@ -2,12 +2,11 @@
 
 /**
  * Node class representing a single node in the suffix tree.
- * Similar to your C++ Node structure, but adapted to JS.
  */
 class Node {
     constructor(start, end) {
-      this.start = start;            // Index of the substring start in text
-      this.end = end;                // If it's a leaf, may be a global reference (null) or number
+      this.start = start;            
+      this.end = end;                
       this.children = new Array(27).fill(null); // 26 letters + '$'
       this.suffixLink = null;
       this.suffixIndex = -1;         // For leaves
@@ -15,7 +14,7 @@ class Node {
   
     /**
      * Returns the length of the edge from parent->this node.
-     * If 'end' is null or not a simple number, we fall back to currentLeafEnd for leaves.
+     * If 'end' is null, we fall back to currentLeafEnd for leaves.
      */
     edgeLength(currentLeafEnd) {
       const realEnd = (typeof this.end === 'number') ? this.end : currentLeafEnd;
@@ -23,12 +22,9 @@ class Node {
     }
   }
   
-  /**
-   * SuffixTree class implementing Ukkonen's algorithm step by step.
-   */
   export class SuffixTree {
     constructor(text) {
-      this.text = text;            // The input text (with '$' at the end)
+      this.text = text;            
       this.size = text.length;     
       this.root = null;
   
@@ -40,27 +36,21 @@ class Node {
       this.leafEnd = -1;
       this.lastCreatedNode = null;
   
-      // For step-by-step snapshots
+      // Step-by-step snapshots
       this.steps = [];
-      this.currentStepIndex = 0;
   
-      // Build and record snapshots
+      // Build
       this.buildSuffixTreeStepByStep();
   
-      // Assign suffixIndex to leaves after the full build
+      // Assign suffix indices after full build
       this.setSuffixIndexByDFS(this.root, 0);
     }
   
     // --------------------------
     // (1) Build Step-by-Step
     // --------------------------
-  
-    /**
-     * Builds the suffix tree using Ukkonen's algorithm,
-     * recording each extension as a separate step.
-     */
     buildSuffixTreeStepByStep() {
-      // Create the root node
+      // Create root
       this.root = new Node(-1, -1);
       this.activeNode = this.root;
       this.leafEnd = -1;
@@ -68,16 +58,13 @@ class Node {
       this.activeLength = 0;
       this.lastCreatedNode = null;
   
-      // Insert each character one by one
+      // Insert each character
       for (let i = 0; i < this.size; i++) {
         this.extendSuffixTree(i);
         this.recordStep(`Extended with '${this.text[i]}' (i=${i})`);
       }
     }
   
-    /**
-     * Ukkonen's extension for position 'pos'.
-     */
     extendSuffixTree(pos) {
       this.leafEnd = pos;
       this.remainingSuffixCount++;
@@ -90,21 +77,20 @@ class Node {
   
         const edgeIndex = this.charToIndex(this.text[this.activeEdge]);
         if (!this.activeNode.children[edgeIndex]) {
-          // Rule 2: Create a new leaf node
+          // Create new leaf
           this.activeNode.children[edgeIndex] = new Node(pos, null);
   
-          // If there was a node waiting for a suffix link, link it
           if (this.lastCreatedNode) {
             this.lastCreatedNode.suffixLink = this.activeNode;
             this.lastCreatedNode = null;
           }
         } else {
-          // There's an existing edge from activeNode
+          // There's an existing edge
           const nextNode = this.activeNode.children[edgeIndex];
           if (this.walkDown(nextNode)) {
             continue;
           }
-          // If the next character is the same as text[pos], just increment activeLength
+          // If next char matches
           const nextChar = this.text[nextNode.start + this.activeLength];
           if (nextChar === this.text[pos]) {
             if (this.lastCreatedNode && this.activeNode !== this.root) {
@@ -114,17 +100,15 @@ class Node {
             this.activeLength++;
             break;
           }
-  
-          // Otherwise, split the edge
+          // Split
           const splitEnd = nextNode.start + this.activeLength - 1;
           const splitNode = new Node(nextNode.start, splitEnd);
           this.activeNode.children[edgeIndex] = splitNode;
   
-          // Create a new leaf for the new character
+          // New leaf
           const leafIndex = this.charToIndex(this.text[pos]);
           splitNode.children[leafIndex] = new Node(pos, null);
   
-          // Adjust the old edge
           nextNode.start += this.activeLength;
           const nextIndex = this.charToIndex(this.text[nextNode.start]);
           splitNode.children[nextIndex] = nextNode;
@@ -135,7 +119,6 @@ class Node {
           this.lastCreatedNode = splitNode;
         }
   
-        // Decrement the remaining suffix count
         this.remainingSuffixCount--;
         if (this.activeNode === this.root && this.activeLength > 0) {
           this.activeLength--;
@@ -146,9 +129,6 @@ class Node {
       }
     }
   
-    /**
-     * Ukkonen's walkDown check.
-     */
     walkDown(node) {
       const edgeLen = node.edgeLength(this.leafEnd);
       if (this.activeLength >= edgeLen) {
@@ -160,19 +140,12 @@ class Node {
       return false;
     }
   
-    /**
-     * Convert 'A'..'Z' + '$' to indices [0..26].
-     */
     charToIndex(c) {
       if (c === '$') return 26;
       return c.charCodeAt(0) - 'A'.charCodeAt(0);
     }
   
-    /**
-     * Record the current state of the tree as a step.
-     */
     recordStep(message) {
-      // Create a shallow snapshot
       this.steps.push({
         message,
         snapshotRoot: this.cloneNode(this.root),
@@ -183,16 +156,11 @@ class Node {
       });
     }
   
-    /**
-     * Clones the tree structure recursively to store in steps[].
-     * For a fully correct clone, also copy 'suffixLink' if you want to visualize it.
-     */
     cloneNode(node) {
       if (!node) return null;
       const newNode = new Node(node.start, node.end);
-      newNode.suffixLink = node.suffixLink;  // just reference
+      newNode.suffixLink = node.suffixLink;  
       newNode.suffixIndex = node.suffixIndex;
-  
       for (let i = 0; i < 27; i++) {
         if (node.children[i]) {
           newNode.children[i] = this.cloneNode(node.children[i]);
@@ -201,9 +169,6 @@ class Node {
       return newNode;
     }
   
-    // ----------------------------------
-    // (2) Set Suffix Indices by DFS
-    // ----------------------------------
     setSuffixIndexByDFS(node, labelHeight) {
       if (!node) return;
       let isLeaf = true;
@@ -215,29 +180,24 @@ class Node {
         }
       }
       if (isLeaf) {
-        // suffixIndex = size - labelHeight
         node.suffixIndex = this.size - labelHeight;
       }
     }
   
-    // ----------------------------------
-    // (3) Operations
-    // ----------------------------------
+    // --------------------------
+    // (2) Operations
+    // --------------------------
   
-    /**
-     * Search(P): Return true if pattern P is found in the tree.
-     */
     search(pattern) {
       let current = this.root;
       let pos = 0;
       while (pos < pattern.length) {
         const idx = this.charToIndex(pattern[pos]);
         if (!current.children[idx]) {
-          return false; // No path for this character
+          return false;
         }
         const child = current.children[idx];
         const edgeLen = child.edgeLength(this.leafEnd);
-        // Compare substring on this edge
         let i = 0;
         while (i < edgeLen && pos < pattern.length) {
           if (this.text[child.start + i] !== pattern[pos]) {
@@ -251,9 +211,6 @@ class Node {
       return true;
     }
   
-    /**
-     * findAllMatches(P): Return array of starting positions (suffix indices).
-     */
     findAllMatches(pattern) {
       const node = this._findNode(pattern);
       if (!node) return [];
@@ -297,21 +254,15 @@ class Node {
       }
     }
   
-    /**
-     * longestRepeatedSubstring(): Return the LRS by finding the deepest internal node (≥2 children).
-     */
     longestRepeatedSubstring() {
       let lrs = "";
       const self = this;
   
       function dfs(node, path) {
         if (!node) return;
-        // Count children
         let childCount = 0;
         for (let i = 0; i < 27; i++) {
-          if (node.children[i]) {
-            childCount++;
-          }
+          if (node.children[i]) childCount++;
         }
         if (childCount >= 2 && path.length > lrs.length) {
           lrs = path;
@@ -331,79 +282,55 @@ class Node {
     }
   
     /**
-     * shortestUniqueSubstring(): Return the SUS by finding the shallowest node that leads to exactly 1 leaf.
-     * We'll do a simple DFS approach. This is a simplified version; you can refine if needed.
+     * Shortest Unique Substring (with partial-edge logic).
+     * If a subtree has exactly one leaf, we consider all prefixes of the path to that node.
      */
     shortestUniqueSubstring() {
-        let sus = "";
-        let minLen = Number.MAX_SAFE_INTEGER;
-        const self = this;
-      
-        /**
-         * DFS that:
-         *  1. Computes how many leaves exist under each node (leafCount).
-         *  2. If leafCount == 1, the path from root to this node is unique.
-         *  3. We then consider partial prefixes of the *last* edge used to get here,
-         *     ensuring we catch smaller substrings that do not contain '$'.
-         */
-        function dfs(node, pathSoFar) {
-          if (!node) return 0;
-      
-          let totalLeaves = 0;
-          let childCount = 0;
-      
-          // Explore each child
-          for (let i = 0; i < 27; i++) {
-            if (node.children[i]) {
-              childCount++;
-              const child = node.children[i];
-              // Full label for the edge child
-              const edgeLen = child.edgeLength(self.leafEnd);
-              const edgeStr = self.text.substring(child.start, child.start + edgeLen);
-      
-              // Recursively count leaves in the child's subtree
-              totalLeaves += dfs(child, pathSoFar + edgeStr);
-            }
+      let sus = "";
+      let minLen = Number.MAX_SAFE_INTEGER;
+      const self = this;
+  
+      function dfs(node, pathSoFar) {
+        if (!node) return 0;
+  
+        let totalLeaves = 0;
+        let childCount = 0;
+  
+        for (let i = 0; i < 27; i++) {
+          if (node.children[i]) {
+            childCount++;
+            const child = node.children[i];
+            const edgeLen = child.edgeLength(self.leafEnd);
+            const edgeStr = self.text.substring(child.start, child.start + edgeLen);
+            totalLeaves += dfs(child, pathSoFar + edgeStr);
           }
-      
-          // If no children, this node is a leaf => 1 leaf
-          if (childCount === 0) {
-            totalLeaves = 1;
-          }
-      
-          // If exactly 1 leaf => the entire pathSoFar is unique
-          if (totalLeaves === 1) {
-            // But pathSoFar might contain '$' (we discard those).
-            // Also, the entire pathSoFar might be large. We want to check
-            // partial prefixes of the *last* edge we just added, because
-            // a shorter prefix might already be unique.
-            if (!pathSoFar.includes('$') && pathSoFar.length > 0 && pathSoFar.length < minLen) {
-              minLen = pathSoFar.length;
-              sus = pathSoFar;
-            }
-      
-            // --- PARTIAL-EDGE LOGIC ---
-            // The pathSoFar is the entire string from root to this node.
-            // We can try every proper prefix (1..pathSoFar.length) to see if it's smaller,
-            // provided it doesn't contain '$'.
-            // Because if the entire path is unique, any prefix that doesn't intersect a branching
-            // is also unique (the tree compressed a single chain).
-            for (let prefixLen = 1; prefixLen < pathSoFar.length; prefixLen++) {
-              const candidate = pathSoFar.substring(0, prefixLen);
-              if (candidate.includes('$')) break; // skip if it has '$'
-              if (candidate.length < minLen) {
-                minLen = candidate.length;
-                sus = candidate;
-              }
-            }
-          }
-      
-          return totalLeaves;
         }
-      
-        dfs(this.root, "");
-        return sus;
+  
+        if (childCount === 0) {
+          totalLeaves = 1; // leaf
+        }
+  
+        if (totalLeaves === 1) {
+          // The entire pathSoFar is unique if no '$'
+          if (!pathSoFar.includes('$') && pathSoFar.length > 0 && pathSoFar.length < minLen) {
+            minLen = pathSoFar.length;
+            sus = pathSoFar;
+          }
+          // Check partial prefixes
+          for (let prefixLen = 1; prefixLen < pathSoFar.length; prefixLen++) {
+            const candidate = pathSoFar.substring(0, prefixLen);
+            if (candidate.includes('$')) break;
+            if (candidate.length < minLen) {
+              minLen = candidate.length;
+              sus = candidate;
+            }
+          }
+        }
+        return totalLeaves;
       }
-      
+  
+      dfs(this.root, "");
+      return sus;
+    }
   }
   

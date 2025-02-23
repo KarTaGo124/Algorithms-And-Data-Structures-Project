@@ -8,23 +8,23 @@
 <body>
   <h1>Suffix Tree Demo</h1>
   
-  <!-- Input for building the tree -->
+  <!-- Build input -->
   <div>
     <input id="inputString" type="text" placeholder="Enter a string" />
     <button id="buildTreeBtn">Build Suffix Tree</button>
   </div>
 
-  <!-- Step navigation (like Brenden's format) -->
+  <!-- Step navigation -->
   <div>
     <p id="stepIndicator">Step 0 of 0</p>
     <button id="prevBtn">Prev</button>
     <button id="nextBtn">Next</button>
   </div>
 
-  <!-- Visualization container (will display text or an SVG) -->
+  <!-- Visualization container -->
   <div id="treeContainer"></div>
 
-  <!-- Operations: pattern search, find all matches, LRS, SUS -->
+  <!-- Operations -->
   <div>
     <input id="patternInput" type="text" placeholder="Pattern to search" />
     <button id="searchBtn">Search Pattern</button>
@@ -33,7 +33,7 @@
     <button id="susBtn">Shortest Unique Substring</button>
   </div>
 
-  <!-- Results or status messages -->
+  <!-- Results -->
   <div id="resultContainer"></div>
 
   <script type="module" src="main.js"></script>
