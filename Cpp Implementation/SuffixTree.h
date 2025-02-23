@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <string>
+#include <utility>
 #include <vector>
 #include <algorithm>
 #include <climits> // Para INT_MAX
@@ -69,10 +70,10 @@ public:
     // ======================= Constructor =======================
     // [PAPER: Inicialización en Construction(S)]
     // Se espera que 's' ya incluya el símbolo terminal '$'.
-    SuffixTree(const string &s) : text(s), root(nullptr), activeNode(nullptr),
-                                  activeLength(0), activeEdge('\0'), remainingSuffixCount(0),
-                                  leafEnd(-1), lastCreatedNode(nullptr),
-                                  maxDepth(0), bestString(""), minLength(INT_MAX) {
+    explicit SuffixTree(string s) : text(std::move(s)), root(nullptr), activeNode(nullptr),
+                                    activeLength(0), activeEdge('\0'), remainingSuffixCount(0),
+                                    leafEnd(-1), lastCreatedNode(nullptr),
+                                    maxDepth(0), bestString(""), minLength(INT_MAX) {
         buildSuffixTree(); // Algoritmo 1: Construction(S)
         // [EXTRA] Asignación de suffixIndex a cada hoja mediante una DFS.
         // Esto no aparece explícitamente en el pseudocódigo, pero es esencial en implementaciones prácticas.
@@ -82,21 +83,21 @@ public:
     // ======================= (A) Asignar suffixIndex a las hojas =======================
     // [EXTRA] Función auxiliar: recorre el árbol en DFS y asigna a cada hoja su suffixIndex.
     // Según el paper, la posición del sufijo se puede determinar como n - labelHeight.
-    void setSuffixIndexByDFS(Node *node, int labelHeight) {
+    void setSuffixIndexByDFS(Node *node, const int &labelHeight) {
         if (!node) return;
         bool isLeaf = true;
         // Recorremos todos los hijos
-        for (int i = 0; i < ALPHABET_SIZE; i++) {
-            if (node->children[i] != nullptr) {
+        for (const auto &i: node->children) {
+            if (i != nullptr) {
                 isLeaf = false;
-                Node *child = node->children[i];
+                Node *child = i;
                 // Llamada recursiva: se suma la longitud del edge del hijo
                 setSuffixIndexByDFS(child, labelHeight + child->edgeLength());
             }
         }
         if (isLeaf) {
             // Para una cadena de longitud n, el sufijo que empieza en s se identifica con n - labelHeight.
-            node->suffixIndex = (int) text.size() - labelHeight;
+            node->suffixIndex = static_cast<int>(text.size()) - labelHeight;
         }
     }
 
@@ -104,7 +105,6 @@ public:
     // Pseudocódigo (ver paper):
     //   For i = 0 to n - 1, llamar a extendSuffixTree(i)
     void buildSuffixTree() {
-        int n = text.size();
         int *rootEnd = new int(-1);
         root = new Node(-1, rootEnd);
         activeNode = root;
@@ -114,7 +114,7 @@ public:
         lastCreatedNode = nullptr;
         leafEnd = -1;
         // Itera sobre cada carácter de la cadena
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < text.size(); i++) {
             extendSuffixTree(i); // Algoritmo 5: extendSuffixTree(i)
         }
     }

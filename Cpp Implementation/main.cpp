@@ -38,9 +38,9 @@ int main() {
     capitalizeString(substring);
     vector<int> positions = st.findAllMatches(substring);
     if (positions.empty()) {
-        cout << "El patron no se encontro en el texto.\n";
+        cout << "El patron " << substring << " no se encontro en el texto.\n";
     } else {
-        cout << "El patron se encontro en las posiciones: ";
+        cout << "El patron " << substring << " se encontro en las posiciones: ";
         for (const int pos: positions)
             cout << pos << " ";
         cout << endl;
