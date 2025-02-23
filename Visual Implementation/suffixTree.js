@@ -286,51 +286,29 @@ class Node {
      * If a subtree has exactly one leaf, we consider all prefixes of the path to that node.
      */
     shortestUniqueSubstring() {
-      let sus = "";
-      let minLen = Number.MAX_SAFE_INTEGER;
-      const self = this;
-  
-      function dfs(node, pathSoFar) {
-        if (!node) return 0;
-  
-        let totalLeaves = 0;
-        let childCount = 0;
-  
-        for (let i = 0; i < 27; i++) {
-          if (node.children[i]) {
-            childCount++;
-            const child = node.children[i];
-            const edgeLen = child.edgeLength(self.leafEnd);
-            const edgeStr = self.text.substring(child.start, child.start + edgeLen);
-            totalLeaves += dfs(child, pathSoFar + edgeStr);
-          }
-        }
-  
-        if (childCount === 0) {
-          totalLeaves = 1; // leaf
-        }
-  
-        if (totalLeaves === 1) {
-          // The entire pathSoFar is unique if no '$'
-          if (!pathSoFar.includes('$') && pathSoFar.length > 0 && pathSoFar.length < minLen) {
-            minLen = pathSoFar.length;
-            sus = pathSoFar;
-          }
-          // Check partial prefixes
-          for (let prefixLen = 1; prefixLen < pathSoFar.length; prefixLen++) {
-            const candidate = pathSoFar.substring(0, prefixLen);
-            if (candidate.includes('$')) break;
-            if (candidate.length < minLen) {
-              minLen = candidate.length;
-              sus = candidate;
+        const n = this.size;
+        // Iterar por longitudes crecientes (de 1 a n)
+        for (let len = 1; len <= n; len++) {
+          let candidates = [];
+          // Para cada subcadena de longitud "len"
+          for (let i = 0; i <= n - len; i++) {
+            const candidate = this.text.substring(i, i + len);
+            // No considerar si contiene el símbolo terminal
+            if (candidate.includes('$')) continue;
+            // Usar findAllMatches para obtener las ocurrencias
+            const occ = this.findAllMatches(candidate);
+            if (occ.length === 1) {
+              candidates.push(candidate);
             }
           }
+          // Si se encontró al menos un candidato único, se devuelve el lexicográficamente menor
+          if (candidates.length > 0) {
+            candidates.sort();
+            return candidates[0];
+          }
         }
-        return totalLeaves;
+        return "";
       }
-  
-      dfs(this.root, "");
-      return sus;
-    }
+      
   }
   
