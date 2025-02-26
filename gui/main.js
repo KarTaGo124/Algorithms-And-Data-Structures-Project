@@ -15,6 +15,7 @@ const allMatchesBtn = document.getElementById("allMatchesBtn");
 const lrsBtn = document.getElementById("lrsBtn");
 const susBtn = document.getElementById("susBtn");
 const resultContainerEl = document.getElementById("resultContainer");
+const stringRepresentationEl = document.getElementById("stringRepresentation");
 
 let suffixTree = null;
 let currentStepIndex = 0;
@@ -23,7 +24,9 @@ let currentStepIndex = 0;
 buildTreeBtn.addEventListener("click", () => {
   const userInput = inputStringEl.value.trim().toUpperCase();
   if (!userInput) return;
+  // Asegurar el símbolo terminal
   const text = userInput.endsWith("$") ? userInput : userInput + "$";
+  
   suffixTree = new SuffixTree(text);
   currentStepIndex = 0;
   updateStepIndicator();
@@ -41,7 +44,10 @@ prevBtn.addEventListener("click", () => {
 // Botón Next
 nextBtn.addEventListener("click", () => {
   if (!suffixTree || suffixTree.steps.length === 0) return;
-  currentStepIndex = Math.min(suffixTree.steps.length - 1, currentStepIndex + 1);
+  currentStepIndex = Math.min(
+    suffixTree.steps.length - 1,
+    currentStepIndex + 1
+  );
   updateStepIndicator();
   renderStep(currentStepIndex);
 });
@@ -94,7 +100,9 @@ function updateStepIndicator() {
   if (!suffixTree || suffixTree.steps.length === 0) {
     stepIndicatorEl.textContent = "Step 0 of 0";
   } else {
-    stepIndicatorEl.textContent = `Step ${currentStepIndex + 1} of ${suffixTree.steps.length}`;
+    stepIndicatorEl.textContent = `Step ${currentStepIndex + 1} of ${
+      suffixTree.steps.length
+    }`;
   }
 }
 
@@ -105,11 +113,20 @@ function renderStep(stepIndex) {
     return;
   }
   const stepData = suffixTree.steps[stepIndex];
+
+  // 1) Mostrar mensaje del paso
   treeContainerEl.innerHTML = "";
   const msgEl = document.createElement("p");
   msgEl.textContent = stepData.message;
   treeContainerEl.appendChild(msgEl);
+
+  // 2) Resaltar los caracteres hasta el índice "pos" en este paso
+  renderStringRepresentation(suffixTree.text, stepData.pos);
+
+  // 3) Dibujar el árbol en este estado
   drawTreeSVG(stepData.snapshotRoot, suffixTree.text, suffixTree.leafEnd, treeContainerEl);
+
+  // 4) Mostrar info de puntos activos
   const info = document.createElement("p");
   info.textContent =
     `active_node.start=${stepData.activeNodeStart}, ` +
@@ -117,6 +134,23 @@ function renderStep(stepIndex) {
     `active_length=${stepData.activeLength}, ` +
     `remainder=${stepData.remainder}`;
   treeContainerEl.appendChild(info);
+}
+
+/**
+ * Dibuja la palabra ingresada como una serie de recuadros
+ * y resalta los caracteres hasta highlightPos.
+ */
+function renderStringRepresentation(text, highlightPos) {
+  stringRepresentationEl.innerHTML = "";
+  for (let i = 0; i < text.length; i++) {
+    const span = document.createElement("span");
+    span.classList.add("char-box");
+    if (i <= highlightPos) {
+      span.classList.add("highlighted");
+    }
+    span.textContent = text[i];
+    stringRepresentationEl.appendChild(span);
+  }
 }
 
 // Dibuja el snapshot del árbol como un árbol horizontal usando D3.js
@@ -136,7 +170,7 @@ function drawTreeSVG(rootNode, text, leafEnd, containerEl) {
   // Ajustar layout y separación para aumentar el espaciado vertical
   const treeLayout = d3.tree()
     .size([height, width])
-    .separation((a, b) => 2); // <-- AUMENTA EL VALOR PARA MÁS ESPACIO
+    .separation((a, b) => 2);
 
   treeLayout(rootD3);
 
@@ -217,7 +251,9 @@ function drawTreeSVG(rootNode, text, leafEnd, containerEl) {
     .attr("fill", "white")
     .attr("font-weight", "bold")
     .text(d => {
-      return (d.data.nodeRef && d.data.nodeRef.suffixIndex !== -1) ? String(d.data.nodeRef.suffixIndex) : "•";
+      return (d.data.nodeRef && d.data.nodeRef.suffixIndex !== -1)
+        ? String(d.data.nodeRef.suffixIndex)
+        : "•";
     });
 
   // Dibujar flechas para los suffix links

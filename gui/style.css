@@ -28,22 +28,41 @@ svg {
   color: #333;
 }
 
+/* Estilos para la representación de la palabra */
+#stringRepresentation {
+  margin: 1em 0;
+}
+.char-box {
+  display: inline-block;
+  width: 30px;
+  height: 40px;
+  line-height: 40px;
+  text-align: center;
+  margin: 2px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #eee;
+  font-weight: bold;
+  font-size: 1.1em;
+}
+.char-box.highlighted {
+  background-color: #add8e6; /* Celeste para resaltar */
+}
+
 /* Estilos para D3.js */
 .link {
   stroke: #999;
   stroke-width: 2px;
 }
-
 .link-label {
   font-size: 12px;
   pointer-events: none;
 }
-
 .node circle {
   cursor: pointer;
 }
 
-/* Estilo para las flechas de suffix links */
+/* Flechas de suffix links */
 .suffixLink {
   stroke: blue;
   stroke-dasharray: 5,5;

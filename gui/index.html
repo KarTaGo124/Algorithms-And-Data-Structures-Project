@@ -9,23 +9,26 @@
 <body>
   <h1>Suffix Tree Demo</h1>
   
-  <!-- Build input -->
+  <!-- Entrada de texto -->
   <div>
     <input id="inputString" type="text" placeholder="Enter a string" />
     <button id="buildTreeBtn">Build Suffix Tree</button>
   </div>
 
-  <!-- Step navigation -->
+  <!-- Navegación de pasos -->
   <div>
     <p id="stepIndicator">Step 0 of 0</p>
     <button id="prevBtn">Prev</button>
     <button id="nextBtn">Next</button>
   </div>
 
-  <!-- Visualization container -->
+  <!-- NUEVO: Representación de la palabra ingresada -->
+  <div id="stringRepresentation"></div>
+
+  <!-- Contenedor de visualización del árbol -->
   <div id="treeContainer"></div>
 
-  <!-- Operations -->
+  <!-- Operaciones -->
   <div>
     <input id="patternInput" type="text" placeholder="Pattern to search" />
     <button id="searchBtn">Search Pattern</button>
@@ -34,7 +37,7 @@
     <button id="susBtn">Shortest Unique Substring</button>
   </div>
 
-  <!-- Results -->
+  <!-- Resultados -->
   <div id="resultContainer"></div>
 
   <script type="module" src="main.js"></script>

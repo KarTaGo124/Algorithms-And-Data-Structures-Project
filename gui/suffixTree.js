@@ -14,7 +14,7 @@ class Node {
 
   /**
    * Retorna la longitud de la arista desde el padre hasta este nodo.
-   * Si 'end' es null, se utiliza currentLeafEnd para las hojas.
+   * Si 'end' es null, se usa currentLeafEnd para hojas.
    */
   edgeLength(currentLeafEnd) {
     const realEnd = (typeof this.end === 'number') ? this.end : currentLeafEnd;
@@ -36,7 +36,7 @@ export class SuffixTree {
     this.leafEnd = -1;
     this.lastCreatedNode = null;
 
-    // Instantáneas paso a paso
+    // Instantáneas (paso a paso)
     this.steps = [];
 
     // Construir el árbol paso a paso
@@ -59,7 +59,8 @@ export class SuffixTree {
 
     for (let i = 0; i < this.size; i++) {
       this.extendSuffixTree(i);
-      this.recordStep(`Extended with '${this.text[i]}' (i=${i})`);
+      // Guardar snapshot tras insertar cada carácter
+      this.recordStep(i, `Extended with '${this.text[i]}' (i=${i})`);
     }
   }
 
@@ -142,8 +143,13 @@ export class SuffixTree {
     return c.charCodeAt(0) - 'A'.charCodeAt(0);
   }
 
-  recordStep(message) {
+  /**
+   * Registra un paso (snapshot) del árbol.
+   * Se guarda el índice pos para resaltar el caracter recientemente agregado.
+   */
+  recordStep(pos, message) {
     this.steps.push({
+      pos,
       message,
       snapshotRoot: this.cloneTreeWithSuffixLinks(this.root),
       activeNodeStart: this.activeNode.start,
@@ -153,11 +159,10 @@ export class SuffixTree {
     });
   }
 
-  // Clona el árbol y actualiza los suffix links usando un mapa para mantener la correspondencia
+  // Clona el árbol y actualiza suffix links
   cloneTreeWithSuffixLinks(node) {
     const map = new Map();
     const clonedRoot = this._cloneNodeHelper(node, map);
-    // Actualizar suffix links según el mapeo
     for (let [orig, clone] of map.entries()) {
       if (orig.suffixLink) {
         clone.suffixLink = map.get(orig.suffixLink) || null;
@@ -197,7 +202,6 @@ export class SuffixTree {
   // --------------------------
   // (2) Operaciones
   // --------------------------
-
   search(pattern) {
     let current = this.root;
     let pos = 0;
