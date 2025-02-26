@@ -123,7 +123,7 @@ function renderStep(stepIndex) {
   msgEl.textContent = stepData.message;
   treeContainerEl.appendChild(msgEl);
 
-  // Draw an SVG of the snapshot
+  // Draw an SVG of the snapshot using D3.js with layout horizontal
   drawTreeSVG(
     stepData.snapshotRoot,
     suffixTree.text,
@@ -141,200 +141,133 @@ function renderStep(stepIndex) {
   treeContainerEl.appendChild(info);
 }
 
-// ====================== SVG Tree Drawing (Tidy Layout) ======================
+// ====================== D3.js Horizontal Tree Drawing ======================
 
 /**
  * Build a simple hierarchy object from the suffix tree snapshot.
- * Each node in the returned object has:
- *   { edgeLabel: string, nodeRef: Node, children: [], x: number, depth: number }
+ * Each node has: { edgeLabel: string, nodeRef: Node, children: [] }
  */
 function buildHierarchy(node, parentEdgeLabel, text, leafEnd) {
-    if (!node) return null;
-    const label = parentEdgeLabel || "";
-    const data = {
-      edgeLabel: label,
-      nodeRef: node,
-      children: [],
-      x: 0,
-      depth: 0 // we'll store the "level" in the tree here
-    };
-    for (let i = 0; i < 27; i++) {
-      if (node.children[i]) {
-        const child = node.children[i];
-        const edgeLen = child.edgeLength(leafEnd);
-        const edgeStr = text.substring(child.start, child.start + edgeLen);
-        const childData = buildHierarchy(child, edgeStr, text, leafEnd);
-        if (childData) {
-          data.children.push(childData);
-        }
+  if (!node) return null;
+  const label = parentEdgeLabel || "";
+  const data = {
+    edgeLabel: label,
+    nodeRef: node,
+    children: []
+  };
+  for (let i = 0; i < 27; i++) {
+    if (node.children[i]) {
+      const child = node.children[i];
+      const edgeLen = child.edgeLength(leafEnd);
+      const edgeStr = text.substring(child.start, child.start + edgeLen);
+      const childData = buildHierarchy(child, edgeStr, text, leafEnd);
+      if (childData) {
+        data.children.push(childData);
       }
-    }
-    return data;
-  }
-  
-  // A global counter to assign unique x-coordinates to leaves.
-  let globalLeafCounter = 0;
-  
-  /**
-   * Recursively assign (x, depth) to each node in a tidy manner:
-   *  - If node has no children, it's a leaf => node.x = globalLeafCounter++.
-   *  - Otherwise, layout children first, then node.x = midpoint of children’s x.
-   *  - node.depth = depth.
-   */
-  function layoutTidy(node, depth) {
-    node.depth = depth;
-    if (node.children.length === 0) {
-      // Leaf node
-      node.x = globalLeafCounter++;
-    } else {
-      // Internal node: lay out children, track min & max child.x
-      let minX = Infinity;
-      let maxX = -Infinity;
-      for (const child of node.children) {
-        layoutTidy(child, depth + 1);
-        if (child.x < minX) minX = child.x;
-        if (child.x > maxX) maxX = child.x;
-      }
-      // Place the parent at the midpoint of its children
-      node.x = (minX + maxX) / 2;
     }
   }
-  
-  /**
-   * Draw the suffix tree snapshot as an <svg> using our tidy layout.
-   */
-  function drawTreeSVG(rootNode, text, leafEnd, containerEl) {
-    // Build hierarchy
-    const hierarchy = buildHierarchy(rootNode, "", text, leafEnd);
-    if (!hierarchy) {
-      containerEl.textContent = "Empty tree snapshot.";
-      return;
-    }
-  
-    // 1) Layout
-    globalLeafCounter = 0;
-    layoutTidy(hierarchy, 0);
-  
-    // 2) Collect all nodes for bounding box
-    let minX = Infinity, maxX = -Infinity;
-    let minDepth = Infinity, maxDepth = -Infinity;
-    const allNodes = [];
-  
-    function collectNodes(h) {
-      allNodes.push(h);
-      if (h.x < minX) minX = h.x;
-      if (h.x > maxX) maxX = h.x;
-      if (h.depth < minDepth) minDepth = h.depth;
-      if (h.depth > maxDepth) maxDepth = h.depth;
-      for (const c of h.children) {
-        collectNodes(c);
-      }
-    }
-    collectNodes(hierarchy);
-  
-    // 3) Compute final width/height for <svg>
-    const MARGIN = 60;
-    const X_SCALE = 120;    // Horizontal spacing factor
-    const Y_SPACING = 120;  // Vertical distance between levels
-  
-    // Width covers from minX..maxX, each "unit" scaled by X_SCALE
-    const width = (maxX - minX + 1) * X_SCALE + 2 * MARGIN;
-    // Height covers from minDepth..maxDepth, each level is Y_SPACING
-    const height = (maxDepth - minDepth + 1) * Y_SPACING + 2 * MARGIN;
-  
-    // Create an <svg>
-    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    svg.setAttribute("width", width);
-    svg.setAttribute("height", height);
-    svg.style.backgroundColor = "#f9f9f9";
-    containerEl.appendChild(svg);
-  
-    // Draw edges
-    function drawEdges(parent) {
-        for (const child of parent.children) {
-          // parent coords
-          const px = (parent.x - minX) * X_SCALE + MARGIN;
-          const py = (parent.depth - minDepth) * Y_SPACING + MARGIN;
-          // child coords
-          const cx = (child.x - minX) * X_SCALE + MARGIN;
-          const cy = (child.depth - minDepth) * Y_SPACING + MARGIN;
-      
-          // Draw the line
-          const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-          line.setAttribute("x1", px);
-          line.setAttribute("y1", py);
-          line.setAttribute("x2", cx);
-          line.setAttribute("y2", cy);
-          line.setAttribute("stroke", "#999");
-          line.setAttribute("stroke-width", "2");
-          svg.appendChild(line);
-      
-          // Calculate midpoint for the label
-          const mx = (px + cx) / 2;
-          const my = (py + cy) / 2;
-      
-          // Calculate the angle (in degrees) of the line
-          let angleDeg = (Math.atan2(cy - py, cx - px) * 180) / Math.PI;
-      
-          // OPTIONAL: Keep text from appearing upside-down. If the angle is
-          // beyond +/-90°, flip it by 180° so the label reads left-to-right.
-          if (angleDeg > 90) {
-            angleDeg -= 180;
-          } else if (angleDeg < -90) {
-            angleDeg += 180;
-          }
-      
-          // Create and position the label
-          const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-          // We first translate to the midpoint, rotate, then translate "up" (-10) 
-          // so the text is slightly off the line
-          label.setAttribute(
-            "transform",
-            `translate(${mx},${my}) rotate(${angleDeg}) translate(0,-10)`
-          );
-          label.setAttribute("fill", "black");
-          label.setAttribute("text-anchor", "middle");
-          // So the text is vertically centered on the baseline after rotation
-          label.setAttribute("dominant-baseline", "middle");
-      
-          label.textContent = child.edgeLabel;
-          svg.appendChild(label);
-      
-          // Recurse
-          drawEdges(child);
-        }
-      }
-      
-    drawEdges(hierarchy);
-  
-    // Draw nodes
-    for (const node of allNodes) {
-      const nx = (node.x - minX) * X_SCALE + MARGIN;
-      const ny = (node.depth - minDepth) * Y_SPACING + MARGIN;
-  
-      // Circle
-      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      circle.setAttribute("cx", nx);
-      circle.setAttribute("cy", ny);
-      circle.setAttribute("r", 15);
-      circle.setAttribute("fill", "#f66");
-      circle.setAttribute("stroke", "#333");
-      circle.setAttribute("stroke-width", "1");
-      svg.appendChild(circle);
-  
-      // Label: leaf suffixIndex or "•" for internal
-      let nodeLabel = "•";
-      if (node.nodeRef.suffixIndex !== -1) {
-        nodeLabel = String(node.nodeRef.suffixIndex);
-      }
-      const textEl = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      textEl.setAttribute("x", nx);
-      textEl.setAttribute("y", ny + 5);
-      textEl.setAttribute("fill", "white");
-      textEl.setAttribute("font-weight", "bold");
-      textEl.setAttribute("text-anchor", "middle");
-      textEl.textContent = nodeLabel;
-      svg.appendChild(textEl);
-    }
+  return data;
+}
+
+/**
+ * Draw the suffix tree snapshot as a horizontal tree using D3.js.
+ * La raíz se posiciona a la izquierda y los nodos se extienden hacia la derecha.
+ */
+function drawTreeSVG(rootNode, text, leafEnd, containerEl) {
+  // Build hierarchy from the snapshot
+  const hierarchyData = buildHierarchy(rootNode, "", text, leafEnd);
+  if (!hierarchyData) {
+    containerEl.textContent = "Empty tree snapshot.";
+    return;
   }
   
+  // Clear container
+  containerEl.innerHTML = "";
+  
+  // Setup SVG dimensions and margins
+  const svgWidth = 800, svgHeight = 600;
+  const margin = { top: 60, right: 60, bottom: 60, left: 60 };
+  const width = svgWidth - margin.left - margin.right;
+  const height = svgHeight - margin.top - margin.bottom;
+  
+  // Create d3 hierarchy
+  const rootD3 = d3.hierarchy(hierarchyData, d => d.children);
+  
+  // Create tree layout (horizontal: x = vertical, y = horizontal)
+  const treeLayout = d3.tree().size([height, width]);
+  treeLayout(rootD3);
+  
+  // Create SVG element
+  const svg = d3.select(containerEl)
+    .append("svg")
+    .attr("width", svgWidth)
+    .attr("height", svgHeight)
+    .style("background-color", "#f9f9f9");
+  
+  // Create group element
+  const g = svg.append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+  
+  // Draw links (edges)
+  const links = rootD3.links();
+  g.selectAll("line.link")
+    .data(links)
+    .enter()
+    .append("line")
+    .attr("class", "link")
+    .attr("x1", d => d.source.y)
+    .attr("y1", d => d.source.x)
+    .attr("x2", d => d.target.y)
+    .attr("y2", d => d.target.x)
+    .attr("stroke", "#999")
+    .attr("stroke-width", 2);
+  
+  // Draw link labels (edge prefixes)
+  g.selectAll("text.link-label")
+    .data(links)
+    .enter()
+    .append("text")
+    .attr("class", "link-label")
+    .attr("text-anchor", "middle")
+    .attr("fill", "black")
+    .attr("dominant-baseline", "middle")
+    .attr("transform", function(d) {
+      const x1 = d.source.x, y1 = d.source.y;
+      const x2 = d.target.x, y2 = d.target.y;
+      // Calcular el punto medio
+      const mx = (x1 + x2) / 2;
+      const my = (y1 + y2) / 2;
+      // Calcular el ángulo en grados
+      let angle = Math.atan2(x2 - x1, y2 - y1) * 180 / Math.PI;
+      if (angle > 90) angle -= 180;
+      else if (angle < -90) angle += 180;
+      return `translate(${y1 + (y2 - y1) / 2}, ${x1 + (x2 - x1) / 2}) rotate(${angle}) translate(0, -10)`;
+    })
+    .text(d => d.target.data.edgeLabel);
+  
+  // Draw nodes
+  const nodes = rootD3.descendants();
+  const nodeGroup = g.selectAll("g.node")
+    .data(nodes)
+    .enter()
+    .append("g")
+    .attr("class", "node")
+    .attr("transform", d => `translate(${d.y},${d.x})`);
+  
+  // Draw node circles
+  nodeGroup.append("circle")
+    .attr("r", 15)
+    .attr("fill", "#f66")
+    .attr("stroke", "#333")
+    .attr("stroke-width", 1);
+  
+  // Draw node labels (suffixIndex or "•" para nodos internos)
+  nodeGroup.append("text")
+    .attr("dy", 5)
+    .attr("text-anchor", "middle")
+    .attr("fill", "white")
+    .attr("font-weight", "bold")
+    .text(d => {
+      return (d.data.nodeRef && d.data.nodeRef.suffixIndex !== -1) ? String(d.data.nodeRef.suffixIndex) : "•";
+    });
+}
