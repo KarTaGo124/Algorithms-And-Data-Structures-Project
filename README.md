@@ -17,3 +17,5 @@ Este repositorio contiene una **implementación de un árbol de sufijos (Suffix 
 
 - **Jose Guillermo Galvez Pacori** – [@KarTaGo124](https://github.com/KarTaGo124)
 - **Jesús Valentín Niño Castañeda** – [@Jvnc0503](https://github.com/Jvnc0503)
+- **Milton Joel Cordova Navarro** – [@mcordova-navarro](https://github.com/mcordova-navarro)
+
