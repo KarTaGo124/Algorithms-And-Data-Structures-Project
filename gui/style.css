@@ -42,3 +42,10 @@ svg {
 .node circle {
   cursor: pointer;
 }
+
+/* Estilo para las flechas de suffix links */
+.suffixLink {
+  stroke: blue;
+  stroke-dasharray: 5,5;
+  stroke-width: 2;
+}

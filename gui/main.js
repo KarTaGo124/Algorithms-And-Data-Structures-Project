@@ -2,7 +2,7 @@
 
 import { SuffixTree } from "./suffixTree.js";
 
-// DOM references
+// Referencias DOM
 const inputStringEl = document.getElementById("inputString");
 const buildTreeBtn = document.getElementById("buildTreeBtn");
 const prevBtn = document.getElementById("prevBtn");
@@ -19,20 +19,18 @@ const resultContainerEl = document.getElementById("resultContainer");
 let suffixTree = null;
 let currentStepIndex = 0;
 
-// Build suffix tree
+// Construir el árbol
 buildTreeBtn.addEventListener("click", () => {
   const userInput = inputStringEl.value.trim().toUpperCase();
   if (!userInput) return;
-  // Ensure a terminal symbol
   const text = userInput.endsWith("$") ? userInput : userInput + "$";
-
   suffixTree = new SuffixTree(text);
   currentStepIndex = 0;
   updateStepIndicator();
   renderStep(currentStepIndex);
 });
 
-// Prev
+// Botón Prev
 prevBtn.addEventListener("click", () => {
   if (!suffixTree || suffixTree.steps.length === 0) return;
   currentStepIndex = Math.max(0, currentStepIndex - 1);
@@ -40,18 +38,15 @@ prevBtn.addEventListener("click", () => {
   renderStep(currentStepIndex);
 });
 
-// Next
+// Botón Next
 nextBtn.addEventListener("click", () => {
   if (!suffixTree || suffixTree.steps.length === 0) return;
-  currentStepIndex = Math.min(
-    suffixTree.steps.length - 1,
-    currentStepIndex + 1
-  );
+  currentStepIndex = Math.min(suffixTree.steps.length - 1, currentStepIndex + 1);
   updateStepIndicator();
   renderStep(currentStepIndex);
 });
 
-// Operations
+// Operaciones
 searchBtn.addEventListener("click", () => {
   if (!suffixTree) return;
   const pattern = patternInputEl.value.trim().toUpperCase();
@@ -68,9 +63,7 @@ allMatchesBtn.addEventListener("click", () => {
   if (!pattern) return;
   const positions = suffixTree.findAllMatches(pattern);
   if (positions.length > 0) {
-    resultContainerEl.textContent = `Pattern "${pattern}" found at positions: ${positions.join(
-      ", "
-    )}`;
+    resultContainerEl.textContent = `Pattern "${pattern}" found at positions: ${positions.join(", ")}`;
   } else {
     resultContainerEl.textContent = `Pattern "${pattern}" not found.`;
   }
@@ -96,42 +89,27 @@ susBtn.addEventListener("click", () => {
   }
 });
 
-// Update step label
+// Actualizar indicador de paso
 function updateStepIndicator() {
   if (!suffixTree || suffixTree.steps.length === 0) {
     stepIndicatorEl.textContent = "Step 0 of 0";
   } else {
-    stepIndicatorEl.textContent = `Step ${currentStepIndex + 1} of ${
-      suffixTree.steps.length
-    }`;
+    stepIndicatorEl.textContent = `Step ${currentStepIndex + 1} of ${suffixTree.steps.length}`;
   }
 }
 
-// Render a specific step
+// Renderizar un paso específico
 function renderStep(stepIndex) {
   if (!suffixTree || suffixTree.steps.length === 0) {
     treeContainerEl.textContent = "No steps to display.";
     return;
   }
   const stepData = suffixTree.steps[stepIndex];
-
-  // Clear old content
   treeContainerEl.innerHTML = "";
-
-  // Step message
   const msgEl = document.createElement("p");
   msgEl.textContent = stepData.message;
   treeContainerEl.appendChild(msgEl);
-
-  // Draw an SVG of the snapshot using D3.js with layout horizontal
-  drawTreeSVG(
-    stepData.snapshotRoot,
-    suffixTree.text,
-    suffixTree.leafEnd,
-    treeContainerEl
-  );
-
-  // Show active point info
+  drawTreeSVG(stepData.snapshotRoot, suffixTree.text, suffixTree.leafEnd, treeContainerEl);
   const info = document.createElement("p");
   info.textContent =
     `active_node.start=${stepData.activeNodeStart}, ` +
@@ -141,12 +119,140 @@ function renderStep(stepIndex) {
   treeContainerEl.appendChild(info);
 }
 
-// ====================== D3.js Horizontal Tree Drawing ======================
+// Dibuja el snapshot del árbol como un árbol horizontal usando D3.js
+function drawTreeSVG(rootNode, text, leafEnd, containerEl) {
+  const hierarchyData = buildHierarchy(rootNode, "", text, leafEnd);
+  if (!hierarchyData) {
+    containerEl.textContent = "Empty tree snapshot.";
+    return;
+  }
+  containerEl.innerHTML = "";
+  const svgWidth = 800, svgHeight = 600;
+  const margin = { top: 60, right: 60, bottom: 60, left: 60 };
+  const width = svgWidth - margin.left - margin.right;
+  const height = svgHeight - margin.top - margin.bottom;
+  const rootD3 = d3.hierarchy(hierarchyData, d => d.children);
 
-/**
- * Build a simple hierarchy object from the suffix tree snapshot.
- * Each node has: { edgeLabel: string, nodeRef: Node, children: [] }
- */
+  // Ajustar layout y separación para aumentar el espaciado vertical
+  const treeLayout = d3.tree()
+    .size([height, width])
+    .separation((a, b) => 2); // <-- AUMENTA EL VALOR PARA MÁS ESPACIO
+
+  treeLayout(rootD3);
+
+  const svg = d3.select(containerEl)
+    .append("svg")
+    .attr("width", svgWidth)
+    .attr("height", svgHeight)
+    .style("background-color", "#f9f9f9");
+
+  // Definir marcador de flecha para los suffix links
+  const defs = svg.append("defs");
+  defs.append("marker")
+    .attr("id", "arrow")
+    .attr("viewBox", "0 -5 10 10")
+    .attr("refX", 10)
+    .attr("refY", 0)
+    .attr("markerWidth", 6)
+    .attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("path")
+    .attr("d", "M0,-5L10,0L0,5")
+    .attr("fill", "blue");
+
+  const g = svg.append("g")
+    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+  // Dibujar aristas del árbol
+  const links = rootD3.links();
+  g.selectAll("line.link")
+    .data(links)
+    .enter()
+    .append("line")
+    .attr("class", "link")
+    .attr("x1", d => d.source.y)
+    .attr("y1", d => d.source.x)
+    .attr("x2", d => d.target.y)
+    .attr("y2", d => d.target.x)
+    .attr("stroke", "#999")
+    .attr("stroke-width", 2);
+
+  // Dibujar etiquetas de las aristas
+  g.selectAll("text.link-label")
+    .data(links)
+    .enter()
+    .append("text")
+    .attr("class", "link-label")
+    .attr("text-anchor", "middle")
+    .attr("fill", "black")
+    .attr("dominant-baseline", "middle")
+    .attr("transform", function(d) {
+      const x1 = d.source.x, y1 = d.source.y;
+      const x2 = d.target.x, y2 = d.target.y;
+      let angle = Math.atan2(x2 - x1, y2 - y1) * 180 / Math.PI;
+      if (angle > 90) angle -= 180;
+      else if (angle < -90) angle += 180;
+      return `translate(${y1 + (y2 - y1) / 2}, ${x1 + (x2 - x1) / 2}) rotate(${angle}) translate(0, -10)`;
+    })
+    .text(d => d.target.data.edgeLabel);
+
+  // Dibujar nodos
+  const nodes = rootD3.descendants();
+  const nodeGroup = g.selectAll("g.node")
+    .data(nodes)
+    .enter()
+    .append("g")
+    .attr("class", "node")
+    .attr("transform", d => `translate(${d.y},${d.x})`);
+
+  nodeGroup.append("circle")
+    .attr("r", 15)
+    .attr("fill", "#f66")
+    .attr("stroke", "#333")
+    .attr("stroke-width", 1);
+
+  nodeGroup.append("text")
+    .attr("dy", 5)
+    .attr("text-anchor", "middle")
+    .attr("fill", "white")
+    .attr("font-weight", "bold")
+    .text(d => {
+      return (d.data.nodeRef && d.data.nodeRef.suffixIndex !== -1) ? String(d.data.nodeRef.suffixIndex) : "•";
+    });
+
+  // Dibujar flechas para los suffix links
+  let nodeMap = new Map();
+  nodes.forEach(d => {
+    nodeMap.set(d.data.nodeRef, d);
+  });
+
+  let suffixLinks = [];
+  nodes.forEach(d => {
+    let srcNode = d.data.nodeRef;
+    if (srcNode.suffixLink) {
+      let targetD3 = nodeMap.get(srcNode.suffixLink);
+      if (targetD3) {
+        suffixLinks.push({ source: d, target: targetD3 });
+      }
+    }
+  });
+
+  g.selectAll("line.suffixLink")
+    .data(suffixLinks)
+    .enter()
+    .append("line")
+    .attr("class", "suffixLink")
+    .attr("x1", d => d.source.y)
+    .attr("y1", d => d.source.x)
+    .attr("x2", d => d.target.y)
+    .attr("y2", d => d.target.x)
+    .attr("stroke", "blue")
+    .attr("stroke-dasharray", "5,5")
+    .attr("stroke-width", 2)
+    .attr("marker-end", "url(#arrow)");
+}
+
+// Construir jerarquía para D3.js a partir del snapshot del árbol
 function buildHierarchy(node, parentEdgeLabel, text, leafEnd) {
   if (!node) return null;
   const label = parentEdgeLabel || "";
@@ -167,107 +273,4 @@ function buildHierarchy(node, parentEdgeLabel, text, leafEnd) {
     }
   }
   return data;
-}
-
-/**
- * Draw the suffix tree snapshot as a horizontal tree using D3.js.
- * La raíz se posiciona a la izquierda y los nodos se extienden hacia la derecha.
- */
-function drawTreeSVG(rootNode, text, leafEnd, containerEl) {
-  // Build hierarchy from the snapshot
-  const hierarchyData = buildHierarchy(rootNode, "", text, leafEnd);
-  if (!hierarchyData) {
-    containerEl.textContent = "Empty tree snapshot.";
-    return;
-  }
-  
-  // Clear container
-  containerEl.innerHTML = "";
-  
-  // Setup SVG dimensions and margins
-  const svgWidth = 800, svgHeight = 600;
-  const margin = { top: 60, right: 60, bottom: 60, left: 60 };
-  const width = svgWidth - margin.left - margin.right;
-  const height = svgHeight - margin.top - margin.bottom;
-  
-  // Create d3 hierarchy
-  const rootD3 = d3.hierarchy(hierarchyData, d => d.children);
-  
-  // Create tree layout (horizontal: x = vertical, y = horizontal)
-  const treeLayout = d3.tree().size([height, width]);
-  treeLayout(rootD3);
-  
-  // Create SVG element
-  const svg = d3.select(containerEl)
-    .append("svg")
-    .attr("width", svgWidth)
-    .attr("height", svgHeight)
-    .style("background-color", "#f9f9f9");
-  
-  // Create group element
-  const g = svg.append("g")
-    .attr("transform", `translate(${margin.left},${margin.top})`);
-  
-  // Draw links (edges)
-  const links = rootD3.links();
-  g.selectAll("line.link")
-    .data(links)
-    .enter()
-    .append("line")
-    .attr("class", "link")
-    .attr("x1", d => d.source.y)
-    .attr("y1", d => d.source.x)
-    .attr("x2", d => d.target.y)
-    .attr("y2", d => d.target.x)
-    .attr("stroke", "#999")
-    .attr("stroke-width", 2);
-  
-  // Draw link labels (edge prefixes)
-  g.selectAll("text.link-label")
-    .data(links)
-    .enter()
-    .append("text")
-    .attr("class", "link-label")
-    .attr("text-anchor", "middle")
-    .attr("fill", "black")
-    .attr("dominant-baseline", "middle")
-    .attr("transform", function(d) {
-      const x1 = d.source.x, y1 = d.source.y;
-      const x2 = d.target.x, y2 = d.target.y;
-      // Calcular el punto medio
-      const mx = (x1 + x2) / 2;
-      const my = (y1 + y2) / 2;
-      // Calcular el ángulo en grados
-      let angle = Math.atan2(x2 - x1, y2 - y1) * 180 / Math.PI;
-      if (angle > 90) angle -= 180;
-      else if (angle < -90) angle += 180;
-      return `translate(${y1 + (y2 - y1) / 2}, ${x1 + (x2 - x1) / 2}) rotate(${angle}) translate(0, -10)`;
-    })
-    .text(d => d.target.data.edgeLabel);
-  
-  // Draw nodes
-  const nodes = rootD3.descendants();
-  const nodeGroup = g.selectAll("g.node")
-    .data(nodes)
-    .enter()
-    .append("g")
-    .attr("class", "node")
-    .attr("transform", d => `translate(${d.y},${d.x})`);
-  
-  // Draw node circles
-  nodeGroup.append("circle")
-    .attr("r", 15)
-    .attr("fill", "#f66")
-    .attr("stroke", "#333")
-    .attr("stroke-width", 1);
-  
-  // Draw node labels (suffixIndex or "•" para nodos internos)
-  nodeGroup.append("text")
-    .attr("dy", 5)
-    .attr("text-anchor", "middle")
-    .attr("fill", "white")
-    .attr("font-weight", "bold")
-    .text(d => {
-      return (d.data.nodeRef && d.data.nodeRef.suffixIndex !== -1) ? String(d.data.nodeRef.suffixIndex) : "•";
-    });
 }
