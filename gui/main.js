@@ -123,8 +123,13 @@ function renderStep(stepIndex) {
   // 2) Resaltar los caracteres hasta el índice "pos" en este paso
   renderStringRepresentation(suffixTree.text, stepData.pos);
 
-  // 3) Dibujar el árbol en este estado
-  drawTreeSVG(stepData.snapshotRoot, suffixTree.text, suffixTree.leafEnd, treeContainerEl);
+  // 3) Dibujar el árbol en este estado, usando leafEndSnapshot en vez de suffixTree.leafEnd
+  drawTreeSVG(
+    stepData.snapshotRoot,
+    suffixTree.text,
+    stepData.leafEndSnapshot,  // <-- Usamos el leafEnd correspondiente a este paso
+    treeContainerEl
+  );
 
   // 4) Mostrar info de puntos activos
   const info = document.createElement("p");
@@ -141,6 +146,7 @@ function renderStep(stepIndex) {
  * y resalta los caracteres hasta highlightPos.
  */
 function renderStringRepresentation(text, highlightPos) {
+  if (!stringRepresentationEl) return;
   stringRepresentationEl.innerHTML = "";
   for (let i = 0; i < text.length; i++) {
     const span = document.createElement("span");

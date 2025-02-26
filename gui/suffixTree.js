@@ -60,7 +60,8 @@ export class SuffixTree {
     for (let i = 0; i < this.size; i++) {
       this.extendSuffixTree(i);
       // Guardar snapshot tras insertar cada carácter
-      this.recordStep(i, `Extended with '${this.text[i]}' (i=${i})`);
+      // IMPORTANTE: también guardamos el leafEnd de este paso
+      this.recordStep(i, `Extended with '${this.text[i]}' (i=${i})`, this.leafEnd);
     }
   }
 
@@ -145,9 +146,9 @@ export class SuffixTree {
 
   /**
    * Registra un paso (snapshot) del árbol.
-   * Se guarda el índice pos para resaltar el caracter recientemente agregado.
+   * Ahora también guardamos la versión local de leafEnd (leafEndSnapshot).
    */
-  recordStep(pos, message) {
+  recordStep(pos, message, leafEndSnapshot) {
     this.steps.push({
       pos,
       message,
@@ -156,6 +157,7 @@ export class SuffixTree {
       activeEdge: this.activeEdge,
       activeLength: this.activeLength,
       remainder: this.remainingSuffixCount,
+      leafEndSnapshot
     });
   }
 
