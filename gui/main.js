@@ -232,7 +232,7 @@ function drawTreeSVG(rootNode, text, leafEnd, containerEl) {
       let angle = Math.atan2(x2 - x1, y2 - y1) * 180 / Math.PI;
       if (angle > 90) angle -= 180;
       else if (angle < -90) angle += 180;
-      return `translate(${y1 + (y2 - y1) / 2}, ${x1 + (x2 - x1) / 2}) rotate(${angle}) translate(0, -10)`;
+      return `translate(${y1 + (y2 - y1) / 2}, ${x1 + (x2 - x1) / 2}) rotate(${angle}) translate(0, -7)`;
     })
     .text(d => d.target.data.edgeLabel);
 
